@@ -9,8 +9,6 @@
 *.user
 *.userosscache
 *.sln.docstates
-
-# Mac
 .DS_Store
 
 # User-specific files (MonoDevelop/Xamarin Studio)
@@ -354,3 +352,7 @@ MigrationBackup/
 
 # docker run data
 Docker/run/data/
+
+**/obj/
+**/bin/
+**/.idea/
