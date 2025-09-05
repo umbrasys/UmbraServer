@@ -1,3 +1,4 @@
-[submodule "UmbraAPI"]
-	path = UmbraAPI
+[submodule "MareAPI"]
+	path = MareAPI
 	url = https://git.umbra-sync.net/SirConstance/UmbraAPI.git
+	branch = main
