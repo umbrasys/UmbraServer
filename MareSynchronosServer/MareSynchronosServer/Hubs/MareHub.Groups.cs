@@ -231,6 +231,15 @@ public partial class MareHub
             {
                 sanitizedAlias = sanitizedAlias[..50];
             }
+
+            var normalizedAlias = sanitizedAlias.ToLowerInvariant();
+            var aliasExists = await DbContext.Groups
+                .AnyAsync(g => g.Alias != null && g.Alias.ToLower() == normalizedAlias)
+                .ConfigureAwait(false);
+            if (aliasExists)
+            {
+                throw new System.Exception("Syncshell name is already in use.");
+            }
         }
 
         Group newGroup = new()
