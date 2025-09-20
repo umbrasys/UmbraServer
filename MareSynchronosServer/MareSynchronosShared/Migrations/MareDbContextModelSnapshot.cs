@@ -341,6 +341,10 @@ namespace MareSynchronosServer.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("disable_vfx");
 
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
                     b.Property<bool>("IsPaused")
                         .HasColumnType("boolean")
                         .HasColumnName("is_paused");
@@ -453,6 +457,10 @@ namespace MareSynchronosServer.Migrations
                     b.Property<string>("HashedPassword")
                         .HasColumnType("text")
                         .HasColumnName("hashed_password");
+
+                    b.Property<bool>("IsTemporary")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_temporary");
 
                     b.Property<bool>("InvitesEnabled")
                         .HasColumnType("boolean")

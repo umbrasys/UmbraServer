@@ -144,7 +144,11 @@ public partial class MareHub
 
         var groupPairs = await DbContext.GroupPairs.Where(p => p.GroupGID == dto.Group.GID).Select(p => p.GroupUserUID).AsNoTracking().ToListAsync().ConfigureAwait(false);
 
-        await Clients.Users(groupPairs).Client_GroupSendInfo(new GroupInfoDto(group.ToGroupData(), newOwnerPair.GroupUser.ToUserData(), group.GetGroupPermissions())).ConfigureAwait(false);
+        await Clients.Users(groupPairs).Client_GroupSendInfo(new GroupInfoDto(group.ToGroupData(), newOwnerPair.GroupUser.ToUserData(), group.GetGroupPermissions())
+        {
+            IsTemporary = group.IsTemporary,
+            ExpiresAt = group.ExpiresAt,
+        }).ConfigureAwait(false);
     }
 
     [Authorize(Policy = "Identified")]
@@ -232,9 +236,8 @@ public partial class MareHub
                 sanitizedAlias = sanitizedAlias[..50];
             }
 
-            var normalizedAlias = sanitizedAlias.ToLowerInvariant();
             var aliasExists = await DbContext.Groups
-                .AnyAsync(g => g.Alias != null && g.Alias.ToLower() == normalizedAlias)
+                .AnyAsync(g => g.Alias != null && EF.Functions.ILike(g.Alias!, sanitizedAlias))
                 .ConfigureAwait(false);
             if (aliasExists)
             {
@@ -249,6 +252,8 @@ public partial class MareHub
             InvitesEnabled = true,
             OwnerUID = UserUID,
             Alias = sanitizedAlias,
+            IsTemporary = false,
+            ExpiresAt = null,
         };
 
         GroupPair initialPair = new()
@@ -265,12 +270,98 @@ public partial class MareHub
 
         var self = await DbContext.Users.SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
 
-        await Clients.User(UserUID).Client_GroupSendFullInfo(new GroupFullInfoDto(newGroup.ToGroupData(), self.ToUserData(), GroupPermissions.NoneSet, GroupUserPermissions.NoneSet, GroupUserInfo.None))
-            .ConfigureAwait(false);
+        await Clients.User(UserUID).Client_GroupSendFullInfo(new GroupFullInfoDto(newGroup.ToGroupData(), self.ToUserData(), GroupPermissions.NoneSet, GroupUserPermissions.NoneSet, GroupUserInfo.None)
+        {
+            IsTemporary = newGroup.IsTemporary,
+            ExpiresAt = newGroup.ExpiresAt,
+        }).ConfigureAwait(false);
 
         _logger.LogCallInfo(MareHubLogger.Args(gid));
 
-        return new GroupPasswordDto(newGroup.ToGroupData(), passwd);
+        return new GroupPasswordDto(newGroup.ToGroupData(), passwd)
+        {
+            IsTemporary = newGroup.IsTemporary,
+            ExpiresAt = newGroup.ExpiresAt,
+        };
+    }
+
+    [Authorize(Policy = "Identified")]
+    public async Task<GroupPasswordDto> GroupCreateTemporary(DateTime expiresAtUtc)
+    {
+        _logger.LogCallInfo();
+
+        var now = DateTime.UtcNow;
+        if (expiresAtUtc.Kind == DateTimeKind.Unspecified)
+        {
+            expiresAtUtc = DateTime.SpecifyKind(expiresAtUtc, DateTimeKind.Utc);
+        }
+
+        if (expiresAtUtc <= now)
+        {
+            throw new System.Exception("Expiration must be in the future.");
+        }
+
+        if (expiresAtUtc > now.AddDays(7))
+        {
+            throw new System.Exception("Temporary syncshells may not last longer than 7 days.");
+        }
+
+        var existingGroupsByUser = await DbContext.Groups.CountAsync(u => u.OwnerUID == UserUID).ConfigureAwait(false);
+        var existingJoinedGroups = await DbContext.GroupPairs.CountAsync(u => u.GroupUserUID == UserUID).ConfigureAwait(false);
+        if (existingGroupsByUser >= _maxExistingGroupsByUser || existingJoinedGroups >= _maxJoinedGroupsByUser)
+        {
+            throw new System.Exception($"Max groups for user is {_maxExistingGroupsByUser}, max joined groups is {_maxJoinedGroupsByUser}.");
+        }
+
+        var gid = StringUtils.GenerateRandomString(9);
+        while (await DbContext.Groups.AnyAsync(g => g.GID == "UMB-" + gid).ConfigureAwait(false))
+        {
+            gid = StringUtils.GenerateRandomString(9);
+        }
+        gid = "UMB-" + gid;
+
+        var passwd = StringUtils.GenerateRandomString(16);
+        var sha = SHA256.Create();
+        var hashedPw = StringUtils.Sha256String(passwd);
+
+        Group newGroup = new()
+        {
+            GID = gid,
+            HashedPassword = hashedPw,
+            InvitesEnabled = true,
+            OwnerUID = UserUID,
+            Alias = null,
+            IsTemporary = true,
+            ExpiresAt = expiresAtUtc,
+        };
+
+        GroupPair initialPair = new()
+        {
+            GroupGID = newGroup.GID,
+            GroupUserUID = UserUID,
+            IsPaused = false,
+            IsPinned = true,
+        };
+
+        await DbContext.Groups.AddAsync(newGroup).ConfigureAwait(false);
+        await DbContext.GroupPairs.AddAsync(initialPair).ConfigureAwait(false);
+        await DbContext.SaveChangesAsync().ConfigureAwait(false);
+
+        var self = await DbContext.Users.SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
+
+        await Clients.User(UserUID).Client_GroupSendFullInfo(new GroupFullInfoDto(newGroup.ToGroupData(), self.ToUserData(), GroupPermissions.NoneSet, GroupUserPermissions.NoneSet, GroupUserInfo.None)
+        {
+            IsTemporary = newGroup.IsTemporary,
+            ExpiresAt = newGroup.ExpiresAt,
+        }).ConfigureAwait(false);
+
+        _logger.LogCallInfo(MareHubLogger.Args(gid, "Temporary", expiresAtUtc));
+
+        return new GroupPasswordDto(newGroup.ToGroupData(), passwd)
+        {
+            IsTemporary = newGroup.IsTemporary,
+            ExpiresAt = newGroup.ExpiresAt,
+        };
     }
 
     [Authorize(Policy = "Identified")]
@@ -395,7 +486,11 @@ public partial class MareHub
 
         _logger.LogCallInfo(MareHubLogger.Args(aliasOrGid, "Success"));
 
-        await Clients.User(UserUID).Client_GroupSendFullInfo(new GroupFullInfoDto(group.ToGroupData(), group.Owner.ToUserData(), group.GetGroupPermissions(), newPair.GetGroupPairPermissions(), newPair.GetGroupPairUserInfo())).ConfigureAwait(false);
+        await Clients.User(UserUID).Client_GroupSendFullInfo(new GroupFullInfoDto(group.ToGroupData(), group.Owner.ToUserData(), group.GetGroupPermissions(), newPair.GetGroupPairPermissions(), newPair.GetGroupPairUserInfo())
+        {
+            IsTemporary = group.IsTemporary,
+            ExpiresAt = group.ExpiresAt,
+        }).ConfigureAwait(false);
 
         var self = DbContext.Users.Single(u => u.UID == UserUID);
 
@@ -547,7 +642,11 @@ public partial class MareHub
         var groups = await DbContext.GroupPairs.Include(g => g.Group).Include(g => g.Group.Owner).Where(g => g.GroupUserUID == UserUID).AsNoTracking().ToListAsync().ConfigureAwait(false);
 
         return groups.Select(g => new GroupFullInfoDto(g.Group.ToGroupData(), g.Group.Owner.ToUserData(),
-                g.Group.GetGroupPermissions(), g.GetGroupPairPermissions(), g.GetGroupPairUserInfo())).ToList();
+                g.Group.GetGroupPermissions(), g.GetGroupPairPermissions(), g.GetGroupPairUserInfo())
+        {
+            IsTemporary = g.Group.IsTemporary,
+            ExpiresAt = g.Group.ExpiresAt,
+        }).ToList();
     }
 
     [Authorize(Policy = "Identified")]

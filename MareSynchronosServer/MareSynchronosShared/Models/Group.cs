@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace MareSynchronosShared.Models;
 
@@ -16,4 +17,6 @@ public class Group
     public bool DisableSounds { get; set; }
     public bool DisableAnimations { get; set; }
     public bool DisableVFX { get; set; }
+    public bool IsTemporary { get; set; }
+    public DateTime? ExpiresAt { get; set; }
 }

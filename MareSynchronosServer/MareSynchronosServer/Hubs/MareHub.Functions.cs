@@ -259,7 +259,11 @@ public partial class MareHub
                     var user = await DbContext.Users.SingleAsync(u => u.UID == groupHasMigrated.Item2).ConfigureAwait(false);
 
                     await Clients.Users(groupPairsWithoutSelf.Select(p => p.GroupUserUID)).Client_GroupSendInfo(new GroupInfoDto(group.ToGroupData(),
-                        user.ToUserData(), group.GetGroupPermissions())).ConfigureAwait(false);
+                        user.ToUserData(), group.GetGroupPermissions())
+                    {
+                        IsTemporary = group.IsTemporary,
+                        ExpiresAt = group.ExpiresAt,
+                    }).ConfigureAwait(false);
                 }
                 else
                 {
