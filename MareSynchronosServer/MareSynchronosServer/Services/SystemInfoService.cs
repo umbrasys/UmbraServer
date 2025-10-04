@@ -57,6 +57,7 @@ public class SystemInfoService : IHostedService, IDisposable
             SystemInfoDto = new SystemInfoDto()
             {
                 OnlineUsers = onlineUsers,
+                SupportsTypingState = true,
             };
 
             if (_config.IsMain)

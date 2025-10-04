@@ -17,8 +17,14 @@ public partial class MareHub
         _logger.LogCallInfo(MareHubLogger.Args(isTyping));
 
         var pairedEntries = await GetAllPairedClientsWithPauseState().ConfigureAwait(false);
-        if (pairedEntries.Count == 0)
-            return;
+
+        var sender = await DbContext.Users.AsNoTracking()
+            .SingleAsync(u => u.UID == UserUID)
+            .ConfigureAwait(false);
+
+        var typingDto = new TypingStateDto(sender.ToUserData(), isTyping);
+
+        await Clients.Caller.Client_UserTypingState(typingDto).ConfigureAwait(false);
 
         var recipients = pairedEntries
             .Where(p => !p.IsPaused)
@@ -28,12 +34,6 @@ public partial class MareHub
 
         if (recipients.Count == 0)
             return;
-
-        var sender = await DbContext.Users.AsNoTracking()
-            .SingleAsync(u => u.UID == UserUID)
-            .ConfigureAwait(false);
-
-        var typingDto = new TypingStateDto(sender.ToUserData(), isTyping);
 
         await Clients.Users(recipients).Client_UserTypingState(typingDto).ConfigureAwait(false);
     }
