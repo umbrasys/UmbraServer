@@ -1,11 +1,12 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using Prometheus;
 
 namespace MareSynchronosShared.Metrics;
 
 public class MareMetrics
 {
-    public MareMetrics(ILogger<MareMetrics> logger, List<string> countersToServe, List<string> gaugesToServe)
+    public MareMetrics(ILogger<MareMetrics> logger, IEnumerable<string> countersToServe, IEnumerable<string> gaugesToServe)
     {
         logger.LogInformation("Initializing MareMetrics");
         foreach (var counter in countersToServe)

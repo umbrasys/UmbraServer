@@ -12,6 +12,9 @@ using StackExchange.Redis;
 using UmbraSync.API.Data.Enum;
 using System.Net.Http.Headers;
 using MareSynchronosShared.Utils.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+#nullable enable
 
 namespace MareSynchronosServices.Discord;
 
@@ -21,7 +24,7 @@ public class LodestoneModal : IModal
 
     [InputLabel("Enter the Lodestone URL of your Character")]
     [ModalTextInput("lodestone_url", TextInputStyle.Short, "https://*.finalfantasyxiv.com/lodestone/character/<CHARACTERID>/")]
-    public string LodestoneUrl { get; set; }
+    public string LodestoneUrl { get; set; } = string.Empty;
 }
 
 public class MareModule : InteractionModuleBase
@@ -64,7 +67,7 @@ public class MareModule : InteractionModuleBase
             }
 
             using var scope = _services.CreateScope();
-            using var db = scope.ServiceProvider.GetService<MareDbContext>();
+            using var db = scope.ServiceProvider.GetRequiredService<MareDbContext>();
 
             if (db.LodeStoneAuth.Any(a => a.DiscordId == Context.User.Id))
             {
@@ -359,7 +362,7 @@ public class MareModule : InteractionModuleBase
         _logger.LogInformation("SlashCommand:{userId}:{Method}:{message}:{type}:{uid}", Context.Interaction.User.Id, nameof(SendMessageToClients), message, messageType, uid);
 
         using var scope = _services.CreateScope();
-        using var db = scope.ServiceProvider.GetService<MareDbContext>();
+        using var db = scope.ServiceProvider.GetRequiredService<MareDbContext>();
 
         if (!(await db.LodeStoneAuth.Include(u => u.User).SingleOrDefaultAsync(a => a.DiscordId == Context.Interaction.User.Id))?.User?.IsAdmin ?? true)
         {
@@ -482,7 +485,7 @@ public class MareModule : InteractionModuleBase
         var embed = new EmbedBuilder();
 
         using var scope = _services.CreateScope();
-        using var db = scope.ServiceProvider.GetService<MareDbContext>();
+        using var db = scope.ServiceProvider.GetRequiredService<MareDbContext>();
 
         var lodestoneAuth = await db.LodeStoneAuth.Include(u => u.User).SingleOrDefaultAsync(a => a.DiscordId == discordUserId).ConfigureAwait(false);
         if (lodestoneAuth == null)
@@ -543,7 +546,7 @@ public class MareModule : InteractionModuleBase
         var embed = new EmbedBuilder();
 
         using var scope = _services.CreateScope();
-        using var db = scope.ServiceProvider.GetService<MareDbContext>();
+        using var db = scope.ServiceProvider.GetRequiredService<MareDbContext>();
         if (!(await db.LodeStoneAuth.Include(u => u.User).SingleOrDefaultAsync(a => a.DiscordId == discordUserId))?.User?.IsAdmin ?? true)
         {
             embed.WithTitle("Failed to add user");
@@ -708,7 +711,7 @@ public class MareModule : InteractionModuleBase
 
             var hashedLodestoneId = StringUtils.Sha256String(lodestoneId.ToString());
 
-            await using var db = scope.ServiceProvider.GetService<MareDbContext>();
+            await using var db = scope.ServiceProvider.GetRequiredService<MareDbContext>();
             var existingLodestoneAuth = await db.LodeStoneAuth.Include("User")
                 .FirstOrDefaultAsync(a => a.DiscordId == userid && a.HashedLodestoneId == hashedLodestoneId)
                 .ConfigureAwait(false);
@@ -794,7 +797,7 @@ public class MareModule : InteractionModuleBase
 
             var hashedLodestoneId = StringUtils.Sha256String(lodestoneId.ToString());
 
-            using var db = scope.ServiceProvider.GetService<MareDbContext>();
+            using var db = scope.ServiceProvider.GetRequiredService<MareDbContext>();
 
             // check if discord id or lodestone id is banned
             if (db.BannedRegistrations.Any(a => a.DiscordIdOrLodestoneAuth == userid.ToString() || a.DiscordIdOrLodestoneAuth == hashedLodestoneId))
@@ -855,7 +858,7 @@ public class MareModule : InteractionModuleBase
 
             var hashedLodestoneId = StringUtils.Sha256String(lodestoneId.ToString());
 
-            using var db = scope.ServiceProvider.GetService<MareDbContext>();
+            using var db = scope.ServiceProvider.GetRequiredService<MareDbContext>();
 
             // check if discord id or lodestone id is banned
             if (db.BannedRegistrations.Any(a => a.DiscordIdOrLodestoneAuth == userid.ToString() || a.DiscordIdOrLodestoneAuth == hashedLodestoneId))
@@ -1077,7 +1080,7 @@ public class MareModule : InteractionModuleBase
     private async Task DeletePreviousUserAccount(ulong id)
     {
         using var scope = _services.CreateScope();
-        using var db = scope.ServiceProvider.GetService<MareDbContext>();
+        using var db = scope.ServiceProvider.GetRequiredService<MareDbContext>();
         var discordAuthedUser = await db.LodeStoneAuth.Include(u => u.User).FirstOrDefaultAsync(u => u.DiscordId == id).ConfigureAwait(false);
         if (discordAuthedUser != null)
         {
@@ -1102,7 +1105,7 @@ public class MareModule : InteractionModuleBase
 
         using var scope = serviceProvider.CreateScope();
         var req = new HttpClient();
-        using var db = scope.ServiceProvider.GetService<MareDbContext>();
+        using var db = scope.ServiceProvider.GetRequiredService<MareDbContext>();
 
         var lodestoneAuth = db.LodeStoneAuth.SingleOrDefault(u => u.DiscordId == cmd.User.Id);
         if (lodestoneAuth != null && _botServices.DiscordRelinkLodestoneMapping.ContainsKey(cmd.User.Id))
@@ -1176,7 +1179,7 @@ public class MareModule : InteractionModuleBase
 
         using var scope = serviceProvider.CreateScope();
         var req = new HttpClient();
-        using var db = scope.ServiceProvider.GetService<MareDbContext>();
+        using var db = scope.ServiceProvider.GetRequiredService<MareDbContext>();
 
         var lodestoneAuth = db.LodeStoneAuth.SingleOrDefault(u => u.DiscordId == cmd.User.Id);
         if (lodestoneAuth != null && _botServices.DiscordLodestoneMapping.ContainsKey(cmd.User.Id))

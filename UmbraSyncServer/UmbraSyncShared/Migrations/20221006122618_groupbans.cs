@@ -4,7 +4,7 @@
 
 namespace MareSynchronosServer.Migrations
 {
-    public partial class groupbans : Migration
+    public partial class GroupBans : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {

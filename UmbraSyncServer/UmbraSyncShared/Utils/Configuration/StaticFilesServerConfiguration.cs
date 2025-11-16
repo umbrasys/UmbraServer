@@ -1,4 +1,5 @@
 ﻿using MareSynchronosShared.Utils;
+using System.Collections.Generic;
 using System.Text;
 
 namespace MareSynchronosShared.Utils.Configuration;
@@ -30,7 +31,7 @@ public class StaticFilesServerConfiguration : MareConfigurationBase
     [RemoteConfiguration]
     public Uri CdnFullUrl { get; set; } = null;
     [RemoteConfiguration]
-    public List<CdnShardConfiguration> CdnShardConfiguration { get; set; } = new();
+    public ICollection<CdnShardConfiguration> CdnShardConfiguration { get; set; } = new List<CdnShardConfiguration>();
 
     public bool UseXAccelRedirect { get; set; } = false;
     public string XAccelRedirectPrefix { get; set; } = "/_internal/mare-files/";

@@ -14,6 +14,8 @@ using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using System.Text;
 
+#nullable enable
+
 namespace MareSynchronosServices.Discord;
 
 internal class DiscordBot : IHostedService
@@ -25,7 +27,7 @@ internal class DiscordBot : IHostedService
     private readonly ILogger<DiscordBot> _logger;
     private readonly IHubContext<MareHub> _mareHubContext;
     private readonly IServiceProvider _services;
-    private InteractionService _interactionModule;
+    private InteractionService _interactionModule = null!;
     private CancellationTokenSource? _processReportQueueCts;
     private CancellationTokenSource? _updateStatusCts;
     private CancellationTokenSource? _vanityUpdateCts;

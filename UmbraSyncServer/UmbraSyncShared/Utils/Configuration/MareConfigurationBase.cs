@@ -18,15 +18,15 @@ public class MareConfigurationBase : IMareConfiguration
     {
         var prop = GetType().GetProperty(key);
         if (prop == null) throw new KeyNotFoundException(key);
-        if (prop.PropertyType != typeof(T)) throw new ArgumentException($"Requested {key} with T:{typeof(T)}, where {key} is {prop.PropertyType}");
+        if (prop.PropertyType != typeof(T)) throw new ArgumentException($"Requested {key} with T:{typeof(T)}, where {key} is {prop.PropertyType}", nameof(key));
         return (T)prop.GetValue(this);
     }
 
     public T GetValueOrDefault<T>(string key, T defaultValue)
     {
         var prop = GetType().GetProperty(key);
-        if (prop.PropertyType != typeof(T)) throw new ArgumentException($"Requested {key} with T:{typeof(T)}, where {key} is {prop.PropertyType}");
         if (prop == null) return defaultValue;
+        if (prop.PropertyType != typeof(T)) throw new ArgumentException($"Requested {key} with T:{typeof(T)}, where {key} is {prop.PropertyType}", nameof(key));
         return (T)prop.GetValue(this);
     }
 

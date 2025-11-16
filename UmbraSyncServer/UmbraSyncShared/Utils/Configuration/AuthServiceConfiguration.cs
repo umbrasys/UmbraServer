@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Collections.Generic;
+using System.Text;
 
 namespace MareSynchronosShared.Utils.Configuration;
 
@@ -8,7 +9,7 @@ public class AuthServiceConfiguration : MareConfigurationBase
     public bool UseGeoIP { get; set; } = false;
     public int FailedAuthForTempBan { get; set; } = 5;
     public int TempBanDurationInMinutes { get; set; } = 5;
-    public List<string> WhitelistedIps { get; set; } = new();
+    public ICollection<string> WhitelistedIps { get; set; } = new List<string>();
 
     public int RegisterIpLimit { get; set; } = 3;
     public int RegisterIpDurationInMinutes { get; set; } = 10;

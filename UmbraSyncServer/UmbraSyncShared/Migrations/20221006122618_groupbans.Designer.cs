@@ -13,7 +13,7 @@ namespace MareSynchronosServer.Migrations
 {
     [DbContext(typeof(MareDbContext))]
     [Migration("20221006122618_groupbans")]
-    partial class groupbans
+    partial class GroupBans
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {

@@ -1,15 +1,18 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
 using MareSynchronosShared.Metrics;
+
+#nullable enable
 
 namespace MareSynchronosServices.Discord;
 
 public class DiscordBotServices
 {
     public readonly string[] LodestoneServers = new[] { "eu", "na", "jp", "fr", "de" };
-    public ConcurrentDictionary<ulong, string> DiscordLodestoneMapping = new();
-    public ConcurrentDictionary<ulong, string> DiscordRelinkLodestoneMapping = new();
-    public ConcurrentDictionary<ulong, DateTime> LastVanityChange = new();
-    public ConcurrentDictionary<string, DateTime> LastVanityGidChange = new();
+    public ConcurrentDictionary<ulong, string> DiscordLodestoneMapping { get; } = new();
+    public ConcurrentDictionary<ulong, string> DiscordRelinkLodestoneMapping { get; } = new();
+    public ConcurrentDictionary<ulong, DateTime> LastVanityChange { get; } = new();
+    public ConcurrentDictionary<string, DateTime> LastVanityGidChange { get; } = new(StringComparer.Ordinal);
     private readonly IServiceProvider _serviceProvider;
     private CancellationTokenSource? verificationTaskCts;
 
@@ -20,8 +23,8 @@ public class DiscordBotServices
         Metrics = metrics;
     }
 
-    public ILogger<DiscordBotServices> Logger { get; init; }
-    public MareMetrics Metrics { get; init; }
+    public ILogger<DiscordBotServices> Logger { get; init; } = null!;
+    public MareMetrics Metrics { get; init; } = null!;
     public ConcurrentQueue<KeyValuePair<ulong, Action<IServiceProvider>>> VerificationQueue { get; } = new();
 
     public Task Start()

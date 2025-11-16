@@ -20,7 +20,7 @@ public class RequestController : ControllerBase
 
     [HttpGet]
     [Route(MareFiles.Request_Cancel)]
-    public async Task<IActionResult> CancelQueueRequest(Guid requestId)
+    public IActionResult CancelQueueRequest(Guid requestId)
     {
         try
         {

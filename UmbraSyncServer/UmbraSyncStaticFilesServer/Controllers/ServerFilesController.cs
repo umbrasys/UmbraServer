@@ -19,6 +19,8 @@ using System.Security.Policy;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
+#nullable enable
+
 namespace MareSynchronosStaticFilesServer.Controllers;
 
 [Route(MareFiles.ServerFiles)]
@@ -27,7 +29,6 @@ public class ServerFilesController : ControllerBase
     private static readonly SemaphoreSlim _fileLockDictLock = new(1);
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> _fileUploadLocks = new(StringComparer.Ordinal);
     private readonly string _basePath;
-    private readonly string _coldBasePath;
     private readonly CachedFileProvider _cachedFileProvider;
     private readonly IConfigurationService<StaticFilesServerConfiguration> _configuration;
     private readonly IHubContext<MareHub> _hubContext;
@@ -50,10 +51,7 @@ public class ServerFilesController : ControllerBase
     }
 
     [HttpPost(MareFiles.ServerFiles_DeleteAll)]
-    public async Task<IActionResult> FilesDeleteAll()
-    {
-        return Ok();
-    }
+    public IActionResult FilesDeleteAll() => Ok();
 
     [HttpGet(MareFiles.ServerFiles_GetSizes)]
     public async Task<IActionResult> FilesGetSizes([FromBody] List<string> hashes)

@@ -7,6 +7,8 @@ using MareSynchronosShared.Utils;
 using UmbraSync.API.Routes;
 using MareSynchronosShared.Utils.Configuration;
 
+#nullable enable
+
 namespace MareSynchronosStaticFilesServer.Services;
 
 public sealed class CachedFileProvider : IDisposable
@@ -17,7 +19,7 @@ public sealed class CachedFileProvider : IDisposable
     private readonly MareMetrics _metrics;
     private readonly ServerTokenGenerator _generator;
     private readonly ITouchHashService _touchService;
-    private readonly Uri _remoteCacheSourceUri;
+    private readonly Uri? _remoteCacheSourceUri;
     private readonly bool _useColdStorage;
     private readonly string _hotStoragePath;
     private readonly string _coldStoragePath;
@@ -228,6 +230,10 @@ public sealed class CachedFileProvider : IDisposable
     public async Task<FileStream?> GetAndDownloadFileStream(string hash)
     {
         var fi = await GetAndDownloadFile(hash).ConfigureAwait(false);
+        if (fi == null)
+        {
+            return null;
+        }
         return new FileStream(fi.FullName, FileMode.Open, FileAccess.Read, FileShare.Inheritable | FileShare.Read);
     }
 

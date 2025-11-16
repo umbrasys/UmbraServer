@@ -1,4 +1,5 @@
-﻿using MareSynchronosShared.Data;
+﻿using System.Collections.Generic;
+using MareSynchronosShared.Data;
 using MareSynchronosShared.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -7,7 +8,7 @@ namespace MareSynchronosShared.Utils;
 
 public static class SharedDbFunctions
 {
-    public static async Task<(bool, string)> MigrateOrDeleteGroup(MareDbContext context, Group group, List<GroupPair> groupPairs, int maxGroupsByUser)
+    public static async Task<(bool, string)> MigrateOrDeleteGroup(MareDbContext context, Group group, IEnumerable<GroupPair> groupPairs, int maxGroupsByUser)
     {
         bool groupHasMigrated = false;
         string newOwner = string.Empty;
@@ -37,71 +38,17 @@ public static class SharedDbFunctions
         return (groupHasMigrated, newOwner);
     }
 
-    public static async Task PurgeUser(ILogger _logger, User user, MareDbContext dbContext, int maxGroupsByUser)
+    public static async Task PurgeUser(ILogger logger, User user, MareDbContext dbContext, int maxGroupsByUser)
     {
-        _logger.LogInformation("Purging user: {uid}", user.UID);
+        logger.LogInformation("Purging user: {uid}", user.UID);
 
-        var secondaryUsers = await dbContext.Auth.Include(u => u.User)
-            .Where(u => u.PrimaryUserUID == user.UID).Select(c => c.User).ToListAsync().ConfigureAwait(false);
+        await PurgeSecondaryUsers(logger, user, dbContext, maxGroupsByUser).ConfigureAwait(false);
+        await RemoveLodestoneAndProfileAsync(dbContext, user).ConfigureAwait(false);
+        var auth = await RemoveClientPairsAsync(dbContext, user).ConfigureAwait(false);
+        await RemoveUserFromGroupsAsync(logger, dbContext, user, maxGroupsByUser).ConfigureAwait(false);
+        await RemoveUserGroupBansAsync(dbContext, user).ConfigureAwait(false);
 
-        foreach (var secondaryUser in secondaryUsers)
-        {
-            await PurgeUser(_logger, secondaryUser, dbContext, maxGroupsByUser).ConfigureAwait(false);
-        }
-
-        var lodestone = dbContext.LodeStoneAuth.SingleOrDefault(a => a.User.UID == user.UID);
-
-        var userProfileData = await dbContext.UserProfileData.SingleOrDefaultAsync(u => u.UserUID == user.UID).ConfigureAwait(false);
-
-        if (lodestone != null)
-        {
-            dbContext.Remove(lodestone);
-        }
-
-        if (userProfileData != null)
-        {
-            dbContext.Remove(userProfileData);
-        }
-
-        var auth = dbContext.Auth.Single(a => a.UserUID == user.UID);
-
-        var ownPairData = dbContext.ClientPairs.Where(u => u.User.UID == user.UID).ToList();
-        dbContext.ClientPairs.RemoveRange(ownPairData);
-        var otherPairData = dbContext.ClientPairs.Include(u => u.User)
-            .Where(u => u.OtherUser.UID == user.UID).ToList();
-        dbContext.ClientPairs.RemoveRange(otherPairData);
-
-        var userJoinedGroups = await dbContext.GroupPairs.Include(g => g.Group).Where(u => u.GroupUserUID == user.UID).ToListAsync().ConfigureAwait(false);
-
-        foreach (var userGroupPair in userJoinedGroups)
-        {
-            bool ownerHasLeft = string.Equals(userGroupPair.Group.OwnerUID, user.UID, StringComparison.Ordinal);
-
-            if (ownerHasLeft)
-            {
-                var groupPairs = await dbContext.GroupPairs.Where(g => g.GroupGID == userGroupPair.GroupGID && g.GroupUserUID != user.UID).ToListAsync().ConfigureAwait(false);
-
-                if (!groupPairs.Any())
-                {
-                    _logger.LogInformation("Group {gid} has no new owner, deleting", userGroupPair.GroupGID);
-                    dbContext.Groups.Remove(userGroupPair.Group);
-                }
-                else
-                {
-                    _ = await MigrateOrDeleteGroup(dbContext, userGroupPair.Group, groupPairs, maxGroupsByUser).ConfigureAwait(false);
-                }
-            }
-
-            dbContext.GroupPairs.Remove(userGroupPair);
-
-            await dbContext.SaveChangesAsync().ConfigureAwait(false);
-        }
-
-        var bannedinGroups = await dbContext.GroupBans.Where(u => u.BannedUserUID == user.UID).ToListAsync().ConfigureAwait(false);
-
-        dbContext.GroupBans.RemoveRange(bannedinGroups);
-
-        _logger.LogInformation("User purged: {uid}", user.UID);
+        logger.LogInformation("User purged: {uid}", user.UID);
 
         dbContext.Auth.Remove(auth);
         dbContext.Users.Remove(user);
@@ -120,5 +67,93 @@ public static class SharedDbFunctions
         group.Alias = null;
         await context.SaveChangesAsync().ConfigureAwait(false);
         return true;
+    }
+
+    private static async Task PurgeSecondaryUsers(ILogger logger, User user, MareDbContext dbContext, int maxGroupsByUser)
+    {
+        var secondaryUsers = await dbContext.Auth.Include(u => u.User)
+            .Where(u => u.PrimaryUserUID == user.UID)
+            .Select(c => c.User)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        foreach (var secondaryUser in secondaryUsers)
+        {
+            await PurgeUser(logger, secondaryUser, dbContext, maxGroupsByUser).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task RemoveLodestoneAndProfileAsync(MareDbContext dbContext, User user)
+    {
+        var lodestone = await dbContext.LodeStoneAuth.SingleOrDefaultAsync(a => a.User.UID == user.UID).ConfigureAwait(false);
+        if (lodestone != null)
+        {
+            dbContext.Remove(lodestone);
+        }
+
+        var userProfileData = await dbContext.UserProfileData.SingleOrDefaultAsync(u => u.UserUID == user.UID).ConfigureAwait(false);
+        if (userProfileData != null)
+        {
+            dbContext.Remove(userProfileData);
+        }
+    }
+
+    private static async Task<Auth> RemoveClientPairsAsync(MareDbContext dbContext, User user)
+    {
+        var auth = await dbContext.Auth.SingleAsync(a => a.UserUID == user.UID).ConfigureAwait(false);
+
+        var ownPairData = dbContext.ClientPairs.Where(u => u.User.UID == user.UID).ToList();
+        dbContext.ClientPairs.RemoveRange(ownPairData);
+
+        var otherPairData = dbContext.ClientPairs.Include(u => u.User)
+            .Where(u => u.OtherUser.UID == user.UID)
+            .ToList();
+        dbContext.ClientPairs.RemoveRange(otherPairData);
+
+        return auth;
+    }
+
+    private static async Task RemoveUserFromGroupsAsync(ILogger logger, MareDbContext dbContext, User user, int maxGroupsByUser)
+    {
+        var userJoinedGroups = await dbContext.GroupPairs.Include(g => g.Group)
+            .Where(u => u.GroupUserUID == user.UID)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        foreach (var userGroupPair in userJoinedGroups)
+        {
+            bool ownerHasLeft = string.Equals(userGroupPair.Group.OwnerUID, user.UID, StringComparison.Ordinal);
+
+            if (ownerHasLeft)
+            {
+                var groupPairs = await dbContext.GroupPairs
+                    .Where(g => g.GroupGID == userGroupPair.GroupGID && g.GroupUserUID != user.UID)
+                    .ToListAsync()
+                    .ConfigureAwait(false);
+
+                if (!groupPairs.Any())
+                {
+                    logger.LogInformation("Group {gid} has no new owner, deleting", userGroupPair.GroupGID);
+                    dbContext.Groups.Remove(userGroupPair.Group);
+                }
+                else
+                {
+                    _ = await MigrateOrDeleteGroup(dbContext, userGroupPair.Group, groupPairs, maxGroupsByUser).ConfigureAwait(false);
+                }
+            }
+
+            dbContext.GroupPairs.Remove(userGroupPair);
+
+            await dbContext.SaveChangesAsync().ConfigureAwait(false);
+        }
+    }
+
+    private static async Task RemoveUserGroupBansAsync(MareDbContext dbContext, User user)
+    {
+        var bannedInGroups = await dbContext.GroupBans.Where(u => u.BannedUserUID == user.UID)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        dbContext.GroupBans.RemoveRange(bannedInGroups);
     }
 }

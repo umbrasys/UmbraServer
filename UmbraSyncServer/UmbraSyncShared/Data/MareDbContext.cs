@@ -57,6 +57,15 @@ public class MareDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
+        ConfigureCoreEntities(mb);
+        ConfigureGroupEntities(mb);
+        ConfigureUserProfileEntities(mb);
+        ConfigureCharaDataEntities(mb);
+        ConfigureMcdfShareEntities(mb);
+    }
+
+    private static void ConfigureCoreEntities(ModelBuilder mb)
+    {
         mb.Entity<Auth>().ToTable("auth");
         mb.Entity<User>().ToTable("users");
         mb.Entity<FileCache>().ToTable("file_caches");
@@ -69,6 +78,10 @@ public class MareDbContext : DbContext
         mb.Entity<Banned>().ToTable("banned_users");
         mb.Entity<LodeStoneAuth>().ToTable("lodestone_auth");
         mb.Entity<BannedRegistrations>().ToTable("banned_registrations");
+    }
+
+    private static void ConfigureGroupEntities(ModelBuilder mb)
+    {
         mb.Entity<Group>().ToTable("groups");
         mb.Entity<Group>().HasIndex(c => c.OwnerUID);
         mb.Entity<GroupPair>().ToTable("group_pairs");
@@ -83,9 +96,17 @@ public class MareDbContext : DbContext
         mb.Entity<GroupTempInvite>().HasKey(u => new { u.GroupGID, u.Invite });
         mb.Entity<GroupTempInvite>().HasIndex(c => c.GroupGID);
         mb.Entity<GroupTempInvite>().HasIndex(c => c.Invite);
+    }
+
+    private static void ConfigureUserProfileEntities(ModelBuilder mb)
+    {
         mb.Entity<UserProfileData>().ToTable("user_profile_data");
         mb.Entity<UserProfileData>().HasKey(c => c.UserUID);
         mb.Entity<UserProfileDataReport>().ToTable("user_profile_data_reports");
+    }
+
+    private static void ConfigureCharaDataEntities(ModelBuilder mb)
+    {
         mb.Entity<CharaData>().ToTable("chara_data");
         mb.Entity<CharaData>()
             .HasMany(p => p.Poses)
@@ -130,7 +151,10 @@ public class MareDbContext : DbContext
         mb.Entity<CharaDataAllowance>().HasIndex(c => c.ParentId);
         mb.Entity<CharaDataAllowance>().HasOne(u => u.AllowedGroup).WithMany().HasForeignKey(u => u.AllowedGroupGID).OnDelete(DeleteBehavior.Cascade);
         mb.Entity<CharaDataAllowance>().HasOne(u => u.AllowedUser).WithMany().HasForeignKey(u => u.AllowedUserUID).OnDelete(DeleteBehavior.Cascade);
+    }
 
+    private static void ConfigureMcdfShareEntities(ModelBuilder mb)
+    {
         mb.Entity<McdfShare>().ToTable("mcdf_shares");
         mb.Entity<McdfShare>().HasIndex(s => s.OwnerUID);
         mb.Entity<McdfShare>().HasOne(s => s.Owner).WithMany().HasForeignKey(s => s.OwnerUID).OnDelete(DeleteBehavior.Cascade);
