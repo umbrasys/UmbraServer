@@ -1,6 +1,6 @@
-﻿using MareSynchronos.API.Data;
-using MareSynchronos.API.Data.Enum;
-using MareSynchronos.API.Data.Extensions;
+﻿using UmbraSync.API.Data;
+using UmbraSync.API.Data.Enum;
+using UmbraSync.API.Data.Extensions;
 using MareSynchronosShared.Models;
 
 namespace MareSynchronosServer.Utils

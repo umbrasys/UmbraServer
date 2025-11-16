@@ -1,5 +1,5 @@
-﻿using MareSynchronos.API.Dto.CharaData;
-using MareSynchronos.API.SignalR;
+﻿using UmbraSync.API.Dto.CharaData;
+using UmbraSync.API.SignalR;
 using MareSynchronosServer.Hubs;
 using Microsoft.AspNetCore.SignalR;
 using StackExchange.Redis.Extensions.Core.Abstractions;

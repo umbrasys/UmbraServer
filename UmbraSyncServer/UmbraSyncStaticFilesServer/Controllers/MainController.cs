@@ -1,4 +1,4 @@
-﻿using MareSynchronos.API.Routes;
+﻿using UmbraSync.API.Routes;
 using MareSynchronosStaticFilesServer.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

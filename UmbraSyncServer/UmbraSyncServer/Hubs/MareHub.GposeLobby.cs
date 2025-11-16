@@ -1,5 +1,5 @@
-﻿using MareSynchronos.API.Data;
-using MareSynchronos.API.Dto.CharaData;
+﻿using UmbraSync.API.Data;
+using UmbraSync.API.Dto.CharaData;
 using MareSynchronosServer.Utils;
 using MareSynchronosShared.Metrics;
 using MareSynchronosShared.Utils;

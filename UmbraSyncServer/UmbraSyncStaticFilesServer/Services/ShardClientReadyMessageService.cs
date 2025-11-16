@@ -1,4 +1,4 @@
-﻿using MareSynchronos.API.Routes;
+﻿using UmbraSync.API.Routes;
 using MareSynchronosShared.Services;
 using MareSynchronosShared.Utils;
 using MareSynchronosShared.Utils.Configuration;

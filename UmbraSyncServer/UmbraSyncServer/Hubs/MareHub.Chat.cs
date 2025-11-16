@@ -1,7 +1,7 @@
-using MareSynchronos.API.Data;
-using MareSynchronos.API.Data.Enum;
-using MareSynchronos.API.Dto.Group;
-using MareSynchronos.API.Dto.User;
+using UmbraSync.API.Data;
+using UmbraSync.API.Data.Enum;
+using UmbraSync.API.Dto.Group;
+using UmbraSync.API.Dto.User;
 using MareSynchronosServer.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;

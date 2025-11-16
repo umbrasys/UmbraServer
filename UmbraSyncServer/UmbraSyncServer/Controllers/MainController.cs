@@ -1,5 +1,5 @@
-﻿using MareSynchronos.API.Routes;
-using MareSynchronos.API.SignalR;
+﻿using UmbraSync.API.Routes;
+using UmbraSync.API.SignalR;
 using MareSynchronosServer.Hubs;
 using MareSynchronosServer.Services;
 using Microsoft.AspNetCore.Authorization;

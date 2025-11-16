@@ -1,7 +1,7 @@
-﻿using MareSynchronos.API.Data;
-using MareSynchronos.API.Data.Enum;
-using MareSynchronos.API.Dto;
-using MareSynchronos.API.SignalR;
+﻿using UmbraSync.API.Data;
+using UmbraSync.API.Data.Enum;
+using UmbraSync.API.Dto;
+using UmbraSync.API.SignalR;
 using MareSynchronosServer.Services;
 using MareSynchronosServer.Utils;
 using MareSynchronosShared;

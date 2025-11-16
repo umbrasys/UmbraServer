@@ -1,4 +1,4 @@
-using MareSynchronos.API.SignalR;
+using UmbraSync.API.SignalR;
 using MareSynchronosShared.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -34,7 +34,7 @@ public class DiscoveryNotifyController : Controller
         var name = string.IsNullOrEmpty(dto.FromAlias) ? dto.FromUid : dto.FromAlias;
         var msg = $"Nearby Request: {name} [{dto.FromUid}]";
         _logger.LogInformation("Discovery notify request to {target} from {from}", dto.TargetUid, name);
-        await _hub.Clients.User(dto.TargetUid).Client_ReceiveServerMessage(MareSynchronos.API.Data.Enum.MessageSeverity.Information, msg);
+        await _hub.Clients.User(dto.TargetUid).Client_ReceiveServerMessage(UmbraSync.API.Data.Enum.MessageSeverity.Information, msg);
         return Accepted();
     }
 
@@ -52,7 +52,7 @@ public class DiscoveryNotifyController : Controller
         var name = string.IsNullOrEmpty(dto.FromAlias) ? dto.FromUid : dto.FromAlias;
         var msg = $"Nearby Accept: {name} [{dto.FromUid}]";
         _logger.LogInformation("Discovery notify accept to {target} from {from}", dto.TargetUid, name);
-        await _hub.Clients.User(dto.TargetUid).Client_ReceiveServerMessage(MareSynchronos.API.Data.Enum.MessageSeverity.Information, msg);
+        await _hub.Clients.User(dto.TargetUid).Client_ReceiveServerMessage(UmbraSync.API.Data.Enum.MessageSeverity.Information, msg);
         return Accepted();
     }
 }

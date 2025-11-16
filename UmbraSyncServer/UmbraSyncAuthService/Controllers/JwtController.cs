@@ -1,6 +1,6 @@
-﻿using MareSynchronos.API.Dto;
-using MareSynchronos.API.Dto.Account;
-using MareSynchronos.API.Routes;
+﻿using UmbraSync.API.Dto;
+using UmbraSync.API.Dto.Account;
+using UmbraSync.API.Routes;
 using MareSynchronosAuthService.Services;
 using MareSynchronosShared;
 using MareSynchronosShared.Data;

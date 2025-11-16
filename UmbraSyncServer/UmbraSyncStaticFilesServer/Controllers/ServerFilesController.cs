@@ -1,7 +1,7 @@
 ﻿using K4os.Compression.LZ4.Streams;
-using MareSynchronos.API.Dto.Files;
-using MareSynchronos.API.Routes;
-using MareSynchronos.API.SignalR;
+using UmbraSync.API.Dto.Files;
+using UmbraSync.API.Routes;
+using UmbraSync.API.SignalR;
 using MareSynchronosServer.Hubs;
 using MareSynchronosShared.Data;
 using MareSynchronosShared.Metrics;
@@ -143,7 +143,7 @@ public class ServerFilesController : ControllerBase
 
         if (notCoveredFiles.Any(p => !p.Value.IsForbidden))
         {
-            await _hubContext.Clients.Users(filesSendDto.UIDs).SendAsync(nameof(IMareHub.Client_UserReceiveUploadStatus), new MareSynchronos.API.Dto.User.UserDto(new(MareUser)))
+            await _hubContext.Clients.Users(filesSendDto.UIDs).SendAsync(nameof(IMareHub.Client_UserReceiveUploadStatus), new UmbraSync.API.Dto.User.UserDto(new(MareUser)))
                 .ConfigureAwait(false);
         }
 

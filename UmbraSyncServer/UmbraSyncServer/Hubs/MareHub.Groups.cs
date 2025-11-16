@@ -1,8 +1,8 @@
-﻿using MareSynchronos.API.Data;
-using MareSynchronos.API.Data.Enum;
-using MareSynchronos.API.Data.Extensions;
-using MareSynchronos.API.Dto.Chat;
-using MareSynchronos.API.Dto.Group;
+﻿using UmbraSync.API.Data;
+using UmbraSync.API.Data.Enum;
+using UmbraSync.API.Data.Extensions;
+using UmbraSync.API.Dto.Chat;
+using UmbraSync.API.Dto.Group;
 using MareSynchronosServer.Utils;
 using MareSynchronosShared.Models;
 using MareSynchronosShared.Utils;

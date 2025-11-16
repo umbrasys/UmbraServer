@@ -9,7 +9,7 @@ using MareSynchronosShared.Models;
 using MareSynchronosShared.Utils;
 using MareSynchronosShared.Services;
 using StackExchange.Redis;
-using MareSynchronos.API.Data.Enum;
+using UmbraSync.API.Data.Enum;
 using System.Net.Http.Headers;
 using MareSynchronosShared.Utils.Configuration;
 

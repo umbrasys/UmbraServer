@@ -1,9 +1,9 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using MareSynchronos.API.Data.Enum;
-using MareSynchronos.API.Data.Extensions;
-using MareSynchronos.API.Dto.User;
+using UmbraSync.API.Data.Enum;
+using UmbraSync.API.Data.Extensions;
+using UmbraSync.API.Dto.User;
 using MareSynchronosServer.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;

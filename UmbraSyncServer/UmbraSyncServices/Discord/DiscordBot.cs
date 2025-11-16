@@ -2,9 +2,9 @@
 using Discord.Interactions;
 using Discord.Rest;
 using Discord.WebSocket;
-using MareSynchronos.API.Data.Enum;
-using MareSynchronos.API.Dto.User;
-using MareSynchronos.API.SignalR;
+using UmbraSync.API.Data.Enum;
+using UmbraSync.API.Dto.User;
+using UmbraSync.API.SignalR;
 using MareSynchronosServer.Hubs;
 using MareSynchronosShared.Data;
 using MareSynchronosShared.Services;
