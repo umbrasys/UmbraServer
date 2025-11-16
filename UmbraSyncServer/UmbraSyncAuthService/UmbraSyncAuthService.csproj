@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <AssemblyName>UmbraSyncAuthService</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -33,7 +34,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MareSynchronosShared\MareSynchronosShared.csproj" />
+    <ProjectReference Include="..\UmbraSyncShared\UmbraSyncShared.csproj" />
   </ItemGroup>
 
 </Project>

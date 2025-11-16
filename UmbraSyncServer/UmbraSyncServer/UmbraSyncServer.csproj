@@ -2,9 +2,10 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <UserSecretsId>aspnet-MareSynchronosServer-BA82A12A-0B30-463C-801D-B7E81318CD50</UserSecretsId>
+    <UserSecretsId>aspnet-UmbraSyncServer-BA82A12A-0B30-463C-801D-B7E81318CD50</UserSecretsId>
     <AssemblyVersion>1.1.0.0</AssemblyVersion>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>UmbraSyncServer</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -39,8 +40,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\MareAPI\MareSynchronosAPI\MareSynchronos.API.csproj" />
-    <ProjectReference Include="..\MareSynchronosShared\MareSynchronosShared.csproj" />
+    <ProjectReference Include="..\..\UmbraAPI\UmbraSyncAPI\UmbraSync.API.csproj" />
+    <ProjectReference Include="..\UmbraSyncShared\UmbraSyncShared.csproj" />
   </ItemGroup>
 
 </Project>

@@ -3,6 +3,7 @@
 	<PropertyGroup>
 		<TargetFramework>net9.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
+		<AssemblyName>UmbraSyncShared</AssemblyName>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -53,7 +54,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\..\MareAPI\MareSynchronosAPI\MareSynchronos.API.csproj" />
+	  <ProjectReference Include="..\..\UmbraAPI\UmbraSyncAPI\UmbraSync.API.csproj" />
 	</ItemGroup>
 
 </Project>
