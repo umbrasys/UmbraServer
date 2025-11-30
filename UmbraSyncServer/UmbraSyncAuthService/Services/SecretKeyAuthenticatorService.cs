@@ -70,7 +70,7 @@ public class SecretKeyAuthenticatorService
         _metrics.IncCounter(MetricsAPI.CounterAuthenticationFailures);
 
         _logger.LogWarning("Failed authorization from {ip}", ip);
-        var whitelisted = _configurationService.GetValueOrDefault(nameof(AuthServiceConfiguration.WhitelistedIps), new List<string>());
+        var whitelisted = _configurationService.GetValueOrDefault<ICollection<string>>(nameof(AuthServiceConfiguration.WhitelistedIps), Array.Empty<string>());
         if (!whitelisted.Any(w => ip.Contains(w, StringComparison.OrdinalIgnoreCase)))
         {
             if (_failedAuthorizations.TryGetValue(ip, out var auth))

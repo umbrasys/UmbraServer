@@ -122,7 +122,8 @@ public class AccountRegistrationService
 
     private void RecordIpRegistration(string ip)
     {
-        var whitelisted = _configurationService.GetValueOrDefault(nameof(AuthServiceConfiguration.WhitelistedIps), new List<string>());
+        // Config declares WhitelistedIps as ICollection<string>; request the exact stored type to avoid type mismatch exceptions
+        var whitelisted = _configurationService.GetValueOrDefault<ICollection<string>>(nameof(AuthServiceConfiguration.WhitelistedIps), Array.Empty<string>());
         if (!whitelisted.Any(w => ip.Contains(w, StringComparison.OrdinalIgnoreCase)))
         {
             if (_registrationsPerIp.TryGetValue(ip, out var count))

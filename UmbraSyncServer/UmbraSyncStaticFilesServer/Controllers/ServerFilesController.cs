@@ -57,23 +57,55 @@ public class ServerFilesController : ControllerBase
     [Produces("application/json")]
     public async Task<IActionResult> FilesGetSizes([FromBody] List<string> hashes)
     {
-        var forbiddenFiles = await _mareDbContext.ForbiddenUploadEntries.
-            Where(f => hashes.Contains(f.Hash)).ToListAsync().ConfigureAwait(false);
-        List<DownloadFileDto> response = new();
+        var requested = (hashes ?? new List<string>())
+            .Where(h => !string.IsNullOrWhiteSpace(h))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
-        var cacheFile = await _mareDbContext.Files.AsNoTracking().Where(f => hashes.Contains(f.Hash)).AsNoTracking().Select(k => new { k.Hash, k.Size }).AsNoTracking().ToListAsync().ConfigureAwait(false);
+        if (requested.Count == 0)
+            return Ok(new List<DownloadFileDto>());
 
-        var allFileShards = new List<CdnShardConfiguration>(_configuration.GetValueOrDefault(nameof(StaticFilesServerConfiguration.CdnShardConfiguration), new List<CdnShardConfiguration>()));
+        var forbiddenFiles = await _mareDbContext.ForbiddenUploadEntries
+            .Where(f => requested.Contains(f.Hash))
+            .ToListAsync().ConfigureAwait(false);
 
-        foreach (var file in cacheFile)
+        var cacheFiles = await _mareDbContext.Files
+            .AsNoTracking()
+            .Where(f => requested.Contains(f.Hash))
+            .Select(k => new { k.Hash, k.Size })
+            .ToListAsync().ConfigureAwait(false);
+
+        var cacheDict = cacheFiles.ToDictionary(k => k.Hash, k => k.Size, StringComparer.OrdinalIgnoreCase);
+        var forbiddenDict = forbiddenFiles.ToDictionary(f => f.Hash, f => f, StringComparer.OrdinalIgnoreCase);
+        var shardsConfig = _configuration.GetValueOrDefault<ICollection<CdnShardConfiguration>>(
+            nameof(StaticFilesServerConfiguration.CdnShardConfiguration),
+            Array.Empty<CdnShardConfiguration>());
+        var allFileShards = new List<CdnShardConfiguration>(shardsConfig ?? Array.Empty<CdnShardConfiguration>());
+
+        Uri? DefaultCdnUrlSafely()
         {
-            var forbiddenFile = forbiddenFiles.SingleOrDefault(f => string.Equals(f.Hash, file.Hash, StringComparison.OrdinalIgnoreCase));
-            Uri? baseUrl = null;
+            try { return _configuration.GetValue<Uri>(nameof(StaticFilesServerConfiguration.CdnFullUrl)); }
+            catch { return null; }
+        }
 
+        bool TryMatches(string pattern, string hash)
+        {
+            try { return new Regex(pattern).IsMatch(hash); }
+            catch { return false; }
+        }
+
+        // Build a response for every requested hash (unknowns => FileExists=false, not 500)
+        List<DownloadFileDto> response = new(requested.Count);
+        foreach (var hash in requested)
+        {
+            forbiddenDict.TryGetValue(hash, out var forbiddenFile);
+
+            Uri? baseUrl = null;
             if (forbiddenFile == null)
             {
-                List<CdnShardConfiguration> selectedShards = new();
-                var matchingShards = allFileShards.Where(f => new Regex(f.FileMatch).IsMatch(file.Hash)).ToList();
+                // Select shard by matching regex; tolerate bad patterns
+                var matchingShards = allFileShards.Where(s => TryMatches(s.FileMatch, hash)).ToList();
+                List<CdnShardConfiguration> selectedShards;
 
                 if (string.Equals(Continent, "*", StringComparison.Ordinal))
                 {
@@ -81,30 +113,68 @@ public class ServerFilesController : ControllerBase
                 }
                 else
                 {
-                    selectedShards = matchingShards.Where(c => c.Continents.Contains(Continent, StringComparer.OrdinalIgnoreCase)).ToList();
+                    selectedShards = matchingShards
+                        .Where(c => c.Continents.Contains(Continent, StringComparer.OrdinalIgnoreCase))
+                        .ToList();
                     if (!selectedShards.Any()) selectedShards = matchingShards;
                 }
 
                 var shard = selectedShards
                     .OrderBy(s => !s.Continents.Any() ? 0 : 1)
                     .ThenBy(s => s.Continents.Contains("*", StringComparer.Ordinal) ? 0 : 1)
-                    .ThenBy(g => Guid.NewGuid()).FirstOrDefault();
+                    .ThenBy(_ => Guid.NewGuid())
+                    .FirstOrDefault();
 
-                baseUrl = shard?.CdnFullUrl ?? _configuration.GetValue<Uri>(nameof(StaticFilesServerConfiguration.CdnFullUrl));
+                baseUrl = shard?.CdnFullUrl ?? DefaultCdnUrlSafely();
             }
+
+            var exists = cacheDict.TryGetValue(hash, out var size) && size > 0;
 
             response.Add(new DownloadFileDto
             {
-                FileExists = file.Size > 0,
+                FileExists = exists,
                 ForbiddenBy = forbiddenFile?.ForbiddenBy ?? string.Empty,
                 IsForbidden = forbiddenFile != null,
-                Hash = file.Hash,
-                Size = file.Size,
-                Url = baseUrl?.ToString() ?? string.Empty,
+                Hash = hash,
+                Size = exists ? size : 0,
+                Url = exists ? (baseUrl?.ToString() ?? string.Empty) : string.Empty,
             });
         }
 
         return Ok(response);
+    }
+
+    [HttpGet(MareFiles.ServerFiles_GetSizes)]
+    [Produces("application/json")]
+    public async Task<IActionResult> FilesGetSizesGet([FromQuery] string? hashes = null)
+    {
+        List<string> parsed = new();
+        if (!string.IsNullOrWhiteSpace(hashes))
+        {
+            try
+            {
+                var direct = JsonSerializer.Deserialize<List<string>>(hashes);
+                if (direct != null) parsed = direct;
+            }
+            catch
+            {
+                try
+                {
+                    var inner = JsonSerializer.Deserialize<string>(hashes);
+                    if (!string.IsNullOrWhiteSpace(inner))
+                    {
+                        var innerList = JsonSerializer.Deserialize<List<string>>(inner);
+                        if (innerList != null) parsed = innerList;
+                    }
+                }
+                catch
+                {
+                    parsed = hashes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                }
+            }
+        }
+
+        return await FilesGetSizes(parsed).ConfigureAwait(false);
     }
 
     [HttpPost(MareFiles.ServerFiles_FilesSend)]
