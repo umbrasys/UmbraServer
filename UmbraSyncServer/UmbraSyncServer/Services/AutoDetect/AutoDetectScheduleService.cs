@@ -97,6 +97,7 @@ public sealed class AutoDetectScheduleService : BackgroundService
                     ExpiresAt = group.ExpiresAt,
                     AutoDetectVisible = group.AutoDetectVisible,
                     PasswordTemporarilyDisabled = group.PasswordTemporarilyDisabled,
+                    MaxUserCount = group.MaxUserCount,
                 }).ConfigureAwait(false);
 
             _logger.LogInformation("AutoDetect schedule applied for {gid}: visible={visible}", gid, desired.Value);

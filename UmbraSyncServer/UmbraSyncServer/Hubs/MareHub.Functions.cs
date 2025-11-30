@@ -265,6 +265,7 @@ public partial class MareHub
                         ExpiresAt = group.ExpiresAt,
                         AutoDetectVisible = group.AutoDetectVisible,
                         PasswordTemporarilyDisabled = group.PasswordTemporarilyDisabled,
+                        MaxUserCount = Math.Min(group.MaxUserCount > 0 ? group.MaxUserCount : _defaultGroupUserCount, _absoluteMaxGroupUserCount),
                     }).ConfigureAwait(false);
                 }
                 else

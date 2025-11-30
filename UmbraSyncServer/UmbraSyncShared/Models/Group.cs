@@ -21,4 +21,5 @@ public class Group
     public DateTime? ExpiresAt { get; set; }
     public bool AutoDetectVisible { get; set; }
     public bool PasswordTemporarilyDisabled { get; set; }
+    public int MaxUserCount { get; set; }
 }

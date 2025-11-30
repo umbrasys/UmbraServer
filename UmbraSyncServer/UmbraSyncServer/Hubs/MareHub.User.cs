@@ -175,6 +175,47 @@ public partial class MareHub
     }
 
     [Authorize(Policy = "Identified")]
+    public async Task UserSetAlias(string? alias)
+    {
+        _logger.LogCallInfo(MareHubLogger.Args(alias ?? "<clear>"));
+
+        // Normalize input
+        var trimmed = alias?.Trim();
+        var user = await DbContext.Users.SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
+
+        // Clear alias if null/empty
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            user.Alias = null;
+            await DbContext.SaveChangesAsync().ConfigureAwait(false);
+            await Clients.Caller.Client_ReceiveServerMessage(MessageSeverity.Information, "Your custom ID has been cleared.").ConfigureAwait(false);
+            return;
+        }
+
+        // Validate format: 3-32 chars, letters/digits/_/- only
+        var norm = trimmed.Normalize(NormalizationForm.FormKC);
+        if (norm.Length < 3 || norm.Length > 32 || !Regex.IsMatch(norm, "^[A-Za-z0-9_-]+$"))
+        {
+            await Clients.Caller.Client_ReceiveServerMessage(MessageSeverity.Error, "Invalid Custom ID. Use 3-32 characters: letters, digits, underscore or hyphen.").ConfigureAwait(false);
+            return;
+        }
+
+        // Enforce uniqueness
+        var exists = await DbContext.Users
+            .AnyAsync(u => u.Alias != null && EF.Functions.ILike(u.Alias!, norm) && u.UID != UserUID)
+            .ConfigureAwait(false);
+        if (exists)
+        {
+            await Clients.Caller.Client_ReceiveServerMessage(MessageSeverity.Warning, $"Custom ID '{norm}' is already taken.").ConfigureAwait(false);
+            return;
+        }
+
+        user.Alias = norm;
+        await DbContext.SaveChangesAsync().ConfigureAwait(false);
+        await Clients.Caller.Client_ReceiveServerMessage(MessageSeverity.Information, $"Your Custom ID is now '{norm}'.").ConfigureAwait(false);
+    }
+
+    [Authorize(Policy = "Identified")]
     public async Task<UserProfileDto> UserGetProfile(UserDto user)
     {
         _logger.LogCallInfo(MareHubLogger.Args(user));

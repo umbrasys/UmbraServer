@@ -121,6 +121,37 @@ public partial class MareHub
     }
 
     [Authorize(Policy = "Identified")]
+    public async Task<bool> GroupSetMaxUserCount(GroupDto dto, int max)
+    {
+        _logger.LogCallInfo(MareHubLogger.Args(dto, max));
+
+        var (hasRights, group) = await TryValidateGroupModeratorOrOwner(dto.Group.GID).ConfigureAwait(false);
+        if (!hasRights) return false;
+
+        // Clamp requested max between 1 and absolute server cap
+        var newMax = Math.Clamp(max, 1, _absoluteMaxGroupUserCount);
+
+        if (group.MaxUserCount == newMax) return true;
+
+        group.MaxUserCount = newMax;
+        await DbContext.SaveChangesAsync().ConfigureAwait(false);
+
+        // Notify all group members of updated group info
+        var groupPairs = await DbContext.GroupPairs.AsNoTracking().Where(p => p.GroupGID == group.GID).Select(p => p.GroupUserUID).ToListAsync().ConfigureAwait(false);
+        await DbContext.Entry(group).Reference(g => g.Owner).LoadAsync().ConfigureAwait(false);
+        await Clients.Users(groupPairs).Client_GroupSendInfo(new GroupInfoDto(group.ToGroupData(), group.Owner.ToUserData(), group.GetGroupPermissions())
+        {
+            IsTemporary = group.IsTemporary,
+            ExpiresAt = group.ExpiresAt,
+            AutoDetectVisible = group.AutoDetectVisible,
+            PasswordTemporarilyDisabled = group.PasswordTemporarilyDisabled,
+            MaxUserCount = Math.Min(group.MaxUserCount > 0 ? group.MaxUserCount : _defaultGroupUserCount, _absoluteMaxGroupUserCount),
+        }).ConfigureAwait(false);
+
+        return true;
+    }
+
+    [Authorize(Policy = "Identified")]
     public async Task GroupChangeOwnership(GroupPairDto dto)
     {
         _logger.LogCallInfo(MareHubLogger.Args(dto));
@@ -152,6 +183,7 @@ public partial class MareHub
             ExpiresAt = group.ExpiresAt,
             AutoDetectVisible = group.AutoDetectVisible,
             PasswordTemporarilyDisabled = group.PasswordTemporarilyDisabled,
+            MaxUserCount = Math.Min(group.MaxUserCount > 0 ? group.MaxUserCount : _defaultGroupUserCount, _absoluteMaxGroupUserCount),
         }).ConfigureAwait(false);
     }
 
@@ -286,6 +318,7 @@ public partial class MareHub
             Alias = sanitizedAlias,
             IsTemporary = false,
             ExpiresAt = null,
+            MaxUserCount = _defaultGroupUserCount,
         };
 
         GroupPair initialPair = new()
@@ -308,6 +341,7 @@ public partial class MareHub
             ExpiresAt = newGroup.ExpiresAt,
             AutoDetectVisible = newGroup.AutoDetectVisible,
             PasswordTemporarilyDisabled = newGroup.PasswordTemporarilyDisabled,
+            MaxUserCount = Math.Min(newGroup.MaxUserCount > 0 ? newGroup.MaxUserCount : _defaultGroupUserCount, _absoluteMaxGroupUserCount),
         }).ConfigureAwait(false);
 
         _logger.LogCallInfo(MareHubLogger.Args(gid));
@@ -367,6 +401,7 @@ public partial class MareHub
             Alias = null,
             IsTemporary = true,
             ExpiresAt = expiresAtUtc,
+            MaxUserCount = _defaultGroupUserCount,
         };
 
         GroupPair initialPair = new()
@@ -660,6 +695,7 @@ public partial class MareHub
                         ExpiresAt = group.ExpiresAt,
                         AutoDetectVisible = group.AutoDetectVisible,
                         PasswordTemporarilyDisabled = group.PasswordTemporarilyDisabled,
+                        MaxUserCount = Math.Min(group.MaxUserCount > 0 ? group.MaxUserCount : _defaultGroupUserCount, _absoluteMaxGroupUserCount),
                     }).ConfigureAwait(false);
                 }
                 return true;
@@ -721,6 +757,7 @@ public partial class MareHub
             ExpiresAt = group.ExpiresAt,
             AutoDetectVisible = group.AutoDetectVisible,
             PasswordTemporarilyDisabled = group.PasswordTemporarilyDisabled,
+            MaxUserCount = Math.Min(group.MaxUserCount > 0 ? group.MaxUserCount : _defaultGroupUserCount, _absoluteMaxGroupUserCount),
         }).ConfigureAwait(false);
 
         return true;
@@ -751,9 +788,12 @@ public partial class MareHub
         bool passwordMatches = !string.IsNullOrEmpty(hashedPassword) && string.Equals(group.HashedPassword, hashedPassword, StringComparison.Ordinal);
         bool hasValidCredential = passwordBypass || passwordMatches || oneTimeInvite != null;
 
+        var effectiveGroupMax = group.MaxUserCount > 0 ? group.MaxUserCount : _defaultGroupUserCount;
+        var effectiveCap = Math.Min(effectiveGroupMax, _absoluteMaxGroupUserCount);
+
         if (!hasValidCredential
             || existingPair != null
-            || existingUserCount >= _maxGroupUserCount
+            || existingUserCount >= effectiveCap
             || (!skipInviteCheck && !group.InvitesEnabled)
             || joinedGroups >= _maxJoinedGroupsByUser
             || isBanned)
@@ -789,6 +829,7 @@ public partial class MareHub
             ExpiresAt = group.ExpiresAt,
             AutoDetectVisible = group.AutoDetectVisible,
             PasswordTemporarilyDisabled = group.PasswordTemporarilyDisabled,
+            MaxUserCount = Math.Min(group.MaxUserCount > 0 ? group.MaxUserCount : _defaultGroupUserCount, _absoluteMaxGroupUserCount),
         }).ConfigureAwait(false);
 
         var self = await DbContext.Users.SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);

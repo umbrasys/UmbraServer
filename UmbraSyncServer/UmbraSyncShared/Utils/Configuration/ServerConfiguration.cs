@@ -16,6 +16,14 @@ public class ServerConfiguration : MareConfigurationBase
     [RemoteConfiguration]
     public int MaxGroupUserCount { get; set; } = 100;
 
+    // Default max users assigned to a newly created syncshell (per-group default)
+    [RemoteConfiguration]
+    public int DefaultGroupUserCount { get; set; } = 100;
+
+    // Absolute ceiling enforced by the server; a group cannot exceed this value
+    [RemoteConfiguration]
+    public int AbsoluteMaxGroupUserCount { get; set; } = 200;
+
     [RemoteConfiguration]
     public int MaxJoinedGroupsByUser { get; set; } = 6;
 
@@ -38,6 +46,8 @@ public class ServerConfiguration : MareConfigurationBase
         sb.AppendLine($"{nameof(MaxExistingGroupsByUser)} => {MaxExistingGroupsByUser}");
         sb.AppendLine($"{nameof(MaxJoinedGroupsByUser)} => {MaxJoinedGroupsByUser}");
         sb.AppendLine($"{nameof(MaxGroupUserCount)} => {MaxGroupUserCount}");
+        sb.AppendLine($"{nameof(DefaultGroupUserCount)} => {DefaultGroupUserCount}");
+        sb.AppendLine($"{nameof(AbsoluteMaxGroupUserCount)} => {AbsoluteMaxGroupUserCount}");
         sb.AppendLine($"{nameof(PurgeUnusedAccounts)} => {PurgeUnusedAccounts}");
         sb.AppendLine($"{nameof(PurgeUnusedAccountsPeriodInDays)} => {PurgeUnusedAccountsPeriodInDays}");
         sb.AppendLine($"{nameof(MaxCharaDataByUser)} => {MaxCharaDataByUser}");

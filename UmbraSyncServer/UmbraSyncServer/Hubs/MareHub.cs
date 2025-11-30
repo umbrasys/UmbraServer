@@ -28,6 +28,8 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
     private readonly int _maxExistingGroupsByUser;
     private readonly int _maxJoinedGroupsByUser;
     private readonly int _maxGroupUserCount;
+    private readonly int _defaultGroupUserCount;
+    private readonly int _absoluteMaxGroupUserCount;
     private readonly IRedisDatabase _redis;
     private readonly GPoseLobbyDistributionService _gPoseLobbyDistributionService;
     private readonly Uri _fileServerAddress;
@@ -49,7 +51,10 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
         _shardName = configuration.GetValue<string>(nameof(ServerConfiguration.ShardName));
         _maxExistingGroupsByUser = configuration.GetValueOrDefault(nameof(ServerConfiguration.MaxExistingGroupsByUser), 3);
         _maxJoinedGroupsByUser = configuration.GetValueOrDefault(nameof(ServerConfiguration.MaxJoinedGroupsByUser), 6);
-        _maxGroupUserCount = configuration.GetValueOrDefault(nameof(ServerConfiguration.MaxGroupUserCount), 100);
+        // Raise server-side maximum capacity default to 200
+        _maxGroupUserCount = configuration.GetValueOrDefault(nameof(ServerConfiguration.MaxGroupUserCount), 200);
+        _defaultGroupUserCount = configuration.GetValueOrDefault(nameof(ServerConfiguration.DefaultGroupUserCount), 100);
+        _absoluteMaxGroupUserCount = configuration.GetValueOrDefault(nameof(ServerConfiguration.AbsoluteMaxGroupUserCount), 200);
         _fileServerAddress = configuration.GetValue<Uri>(nameof(ServerConfiguration.CdnFullUrl));
         _expectedClientVersion = configuration.GetValueOrDefault(nameof(ServerConfiguration.ExpectedClientVersion), new Version(0, 0, 0));
         _maxCharaDataByUser = configuration.GetValueOrDefault(nameof(ServerConfiguration.MaxCharaDataByUser), 10);
@@ -97,7 +102,8 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
                 MaxGroupsCreatedByUser = _maxExistingGroupsByUser,
                 ShardName = _shardName,
                 MaxGroupsJoinedByUser = _maxJoinedGroupsByUser,
-                MaxGroupUserCount = _maxGroupUserCount,
+                // Expose absolute max to the client (UI can cap sliders, etc.)
+                MaxGroupUserCount = _absoluteMaxGroupUserCount,
                 FileServerAddress = _fileServerAddress,
                 MaxCharaData = _maxCharaDataByUser
             },

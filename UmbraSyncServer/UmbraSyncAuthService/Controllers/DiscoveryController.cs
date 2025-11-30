@@ -80,6 +80,7 @@ public class DiscoveryController : Controller
                     : req.DisplayName;
 
                 using var http = new HttpClient();
+                try { http.DefaultRequestHeaders.UserAgent.ParseAdd("UmbraAuthService/1.0"); } catch { /* ignore */ }
                 // Use same host as public (goes through nginx)
                 var baseUrl = $"{Request.Scheme}://{Request.Host.Value}";
                 var url = new Uri(new Uri(baseUrl), "/main/discovery/notifyRequest");
@@ -122,6 +123,7 @@ public class DiscoveryController : Controller
                 : req.DisplayName;
 
             using var http = new HttpClient();
+            try { http.DefaultRequestHeaders.UserAgent.ParseAdd("UmbraAuthService/1.0"); } catch { /* ignore */ }
             var baseUrl = $"{Request.Scheme}://{Request.Host.Value}";
             var url = new Uri(new Uri(baseUrl), "/main/discovery/notifyAccept");
             var serverToken = HttpContext.RequestServices.GetRequiredService<MareSynchronosShared.Utils.ServerTokenGenerator>().Token;
