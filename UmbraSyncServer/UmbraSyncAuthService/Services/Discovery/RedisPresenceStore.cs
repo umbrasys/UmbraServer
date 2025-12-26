@@ -63,7 +63,7 @@ public sealed class RedisPresenceStore : IDiscoveryPresenceStore
                     {
                         try
                         {
-                            var p = JsonSerializer.Deserialize<Presence>(val!);
+                            var p = JsonSerializer.Deserialize<Presence>(val.ToString());
                             if (p != null && string.Equals(p.Uid, uid, StringComparison.Ordinal))
                             {
                                 batch.KeyDeleteAsync(key);
@@ -96,7 +96,7 @@ public sealed class RedisPresenceStore : IDiscoveryPresenceStore
         if (!val.HasValue) return (false, null, string.Empty, null);
         try
         {
-            var p = JsonSerializer.Deserialize<Presence>(val!);
+            var p = JsonSerializer.Deserialize<Presence>(val.ToString());
             if (p == null || string.IsNullOrEmpty(p.Uid)) return (false, null, string.Empty, null);
             if (string.Equals(p.Uid, requesterUid, StringComparison.Ordinal)) return (false, null, string.Empty, null);
 

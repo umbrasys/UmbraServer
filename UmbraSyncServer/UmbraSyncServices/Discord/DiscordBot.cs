@@ -413,7 +413,11 @@ internal class DiscordBot : IHostedService
         while (!_updateStatusCts.IsCancellationRequested)
         {
             var endPoint = _connectionMultiplexer.GetEndPoints().First();
-            var onlineUsers = await _connectionMultiplexer.GetServer(endPoint).KeysAsync(pattern: "UID:*").CountAsync();
+            var onlineUsers = 0;
+            await foreach (var _ in _connectionMultiplexer.GetServer(endPoint).KeysAsync(pattern: "UID:*"))
+            {
+                onlineUsers++;
+            }
 
             //_logger.LogInformation("Users online: " + onlineUsers);
             await _discordClient.SetActivityAsync(new Game("with " + onlineUsers + " Users")).ConfigureAwait(false);

@@ -233,7 +233,11 @@ public partial class MareHub
         if (data.FlaggedForReport) return new UserProfileDto(user.User, true, null, null, "This profile is flagged for report and pending evaluation");
         if (data.ProfileDisabled) return new UserProfileDto(user.User, true, null, null, "This profile was permanently disabled");
 
-        return new UserProfileDto(user.User, false, data.IsNSFW, data.Base64ProfileImage, data.UserDescription);
+        return new UserProfileDto(user.User, false, data.IsNSFW, data.Base64ProfileImage, data.UserDescription,
+            data.RpProfilePictureBase64, data.RpDescription, data.IsRpNSFW,
+            data.RpFirstName, data.RpLastName, data.RpTitle, data.RpAge,
+            data.RpHeight, data.RpBuild, data.RpOccupation, data.RpAffiliation,
+            data.RpAlignment, data.RpAdditionalInfo);
     }
 
     [Authorize(Policy = "Identified")]
@@ -527,6 +531,20 @@ public partial class MareHub
             {
                 existingData.UserDescription = dto.Description;
             }
+
+            if (dto.RpDescription != null) existingData.RpDescription = dto.RpDescription;
+            if (dto.RpProfilePictureBase64 != null) existingData.RpProfilePictureBase64 = dto.RpProfilePictureBase64;
+            if (dto.IsRpNSFW != null) existingData.IsRpNSFW = dto.IsRpNSFW.Value;
+            if (dto.RpFirstName != null) existingData.RpFirstName = dto.RpFirstName;
+            if (dto.RpLastName != null) existingData.RpLastName = dto.RpLastName;
+            if (dto.RpTitle != null) existingData.RpTitle = dto.RpTitle;
+            if (dto.RpAge != null) existingData.RpAge = dto.RpAge;
+            if (dto.RpHeight != null) existingData.RpHeight = dto.RpHeight;
+            if (dto.RpBuild != null) existingData.RpBuild = dto.RpBuild;
+            if (dto.RpOccupation != null) existingData.RpOccupation = dto.RpOccupation;
+            if (dto.RpAffiliation != null) existingData.RpAffiliation = dto.RpAffiliation;
+            if (dto.RpAlignment != null) existingData.RpAlignment = dto.RpAlignment;
+            if (dto.RpAdditionalInfo != null) existingData.RpAdditionalInfo = dto.RpAdditionalInfo;
         }
         else
         {
@@ -535,7 +553,20 @@ public partial class MareHub
                 UserUID = dto.User.UID,
                 Base64ProfileImage = dto.ProfilePictureBase64 ?? null,
                 UserDescription = dto.Description ?? null,
-                IsNSFW = dto.IsNSFW ?? false
+                IsNSFW = dto.IsNSFW ?? false,
+                RpProfilePictureBase64 = dto.RpProfilePictureBase64 ?? null,
+                RpDescription = dto.RpDescription ?? null,
+                IsRpNSFW = dto.IsRpNSFW ?? false,
+                RpFirstName = dto.RpFirstName ?? null,
+                RpLastName = dto.RpLastName ?? null,
+                RpTitle = dto.RpTitle ?? null,
+                RpAge = dto.RpAge ?? null,
+                RpHeight = dto.RpHeight ?? null,
+                RpBuild = dto.RpBuild ?? null,
+                RpOccupation = dto.RpOccupation ?? null,
+                RpAffiliation = dto.RpAffiliation ?? null,
+                RpAlignment = dto.RpAlignment ?? null,
+                RpAdditionalInfo = dto.RpAdditionalInfo ?? null
             };
 
             await DbContext.UserProfileData.AddAsync(userProfileData).ConfigureAwait(false);
