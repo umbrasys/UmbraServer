@@ -46,6 +46,7 @@ public class MareDbContext : DbContext
     public DbSet<UserProfileData> UserProfileData { get; set; }
     public DbSet<UserProfileDataReport> UserProfileReports { get; set; }
     public DbSet<User> Users { get; set; }
+    public DbSet<Slot> Slots { get; set; }
     public DbSet<CharaData> CharaData { get; set; }
     public DbSet<CharaDataFile> CharaDataFiles { get; set; }
     public DbSet<CharaDataFileSwap> CharaDataFileSwaps { get; set; }
@@ -63,6 +64,14 @@ public class MareDbContext : DbContext
         ConfigureUserProfileEntities(mb);
         ConfigureCharaDataEntities(mb);
         ConfigureMcdfShareEntities(mb);
+        ConfigureSlotEntities(mb);
+    }
+
+    private static void ConfigureSlotEntities(ModelBuilder mb)
+    {
+        mb.Entity<Slot>().ToTable("slots");
+        mb.Entity<Slot>().HasIndex(s => s.GroupGID);
+        mb.Entity<Slot>().HasIndex(s => new { s.ServerId, s.TerritoryId, s.WardId, s.PlotId });
     }
 
     private static void ConfigureCoreEntities(ModelBuilder mb)

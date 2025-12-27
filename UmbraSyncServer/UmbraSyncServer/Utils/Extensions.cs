@@ -1,12 +1,39 @@
 ﻿using UmbraSync.API.Data;
 using UmbraSync.API.Data.Enum;
 using UmbraSync.API.Data.Extensions;
+using UmbraSync.API.Dto.Slot;
 using MareSynchronosShared.Models;
 
 namespace MareSynchronosServer.Utils
 {
     public static class Extensions
     {
+        public static SlotInfoResponseDto ToSlotInfoDto(this Slot slot)
+        {
+            return new SlotInfoResponseDto
+            {
+                SlotId = slot.SlotId,
+                SlotName = slot.SlotName,
+                SlotDescription = slot.SlotDescription,
+                Location = new SlotLocationDto
+                {
+                    ServerId = slot.ServerId,
+                    TerritoryId = slot.TerritoryId,
+                    WardId = slot.WardId,
+                    PlotId = slot.PlotId,
+                    X = slot.X,
+                    Y = slot.Y,
+                    Z = slot.Z,
+                    Radius = slot.Radius
+                },
+                AssociatedSyncshell = new SlotSyncshellDto
+                {
+                    Gid = slot.GroupGID,
+                    Name = slot.Group?.Alias ?? slot.GroupGID
+                }
+            };
+        }
+
         public static GroupData ToGroupData(this Group group)
         {
             return new GroupData(group.GID, group.Alias);
