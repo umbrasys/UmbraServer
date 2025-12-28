@@ -222,7 +222,7 @@ public partial class MareHub
 
         var allUserPairs = await GetAllPairedUnpausedUsers().ConfigureAwait(false);
 
-        if (!allUserPairs.Contains(user.User.UID, StringComparison.Ordinal) && !string.Equals(user.User.UID, UserUID, StringComparison.Ordinal))
+        if (!allUserPairs.Contains(user.User.UID) && !string.Equals(user.User.UID, UserUID, StringComparison.Ordinal))
         {
             return new UserProfileDto(user.User, false, null, null, "Due to the pause status you cannot access this users profile.");
         }
