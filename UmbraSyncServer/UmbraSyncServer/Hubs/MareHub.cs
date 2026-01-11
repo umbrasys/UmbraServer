@@ -123,6 +123,7 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
             }
 
             await UpdateUserOnRedis().ConfigureAwait(false);
+            await _redis.AddAsync($"active:{UserCharaIdent}", Context.ConnectionId, expiresIn: TimeSpan.FromMinutes(5)).ConfigureAwait(false);
             return true;
         }
         catch
@@ -144,6 +145,7 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
             try
             {
                 await _redis.SetAddAsync($"connections:{UserCharaIdent}", Context.ConnectionId).ConfigureAwait(false);
+                await _redis.AddAsync($"active:{UserCharaIdent}", Context.ConnectionId, expiresIn: TimeSpan.FromMinutes(5)).ConfigureAwait(false);
                 var connections = await _redis.SetMembersAsync<string>($"connections:{UserCharaIdent}").ConfigureAwait(false);
 
                 if (connections?.Length == 1)
@@ -191,9 +193,17 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
                 var connections = await _redis.SetMembersAsync<string>($"connections:{UserCharaIdent}").ConfigureAwait(false);
                 if (connections == null || connections.Length == 0)
                 {
-                    await GposeLobbyLeave().ConfigureAwait(false);
-                    await RemoveUserFromRedis().ConfigureAwait(false);
-                    await SendOfflineToAllPairedUsers().ConfigureAwait(false);
+                    var activeConnectionId = await _redis.GetAsync<string>($"active:{UserCharaIdent}").ConfigureAwait(false);
+                    if (string.IsNullOrEmpty(activeConnectionId) || string.Equals(activeConnectionId, Context.ConnectionId, StringComparison.Ordinal))
+                    {
+                        await GposeLobbyLeave().ConfigureAwait(false);
+                        await RemoveUserFromRedis().ConfigureAwait(false);
+                        await SendOfflineToAllPairedUsers().ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        _logger.LogCallWarning(MareHubLogger.Args("ObsoleteConnectionId", Context.ConnectionId, "Active", activeConnectionId));
+                    }
                 }
             }
             catch { }

@@ -120,6 +120,8 @@ public class Startup
             hubOptions.EnableDetailedErrors = true;
             hubOptions.MaximumParallelInvocationsPerClient = 10;
             hubOptions.StreamBufferCapacity = 200;
+            hubOptions.ClientTimeoutInterval = TimeSpan.FromMinutes(5);
+            hubOptions.KeepAliveInterval = TimeSpan.FromSeconds(15);
 
             hubOptions.AddFilter<SignalRLimitFilter>();
         }).AddMessagePackProtocol(opt =>

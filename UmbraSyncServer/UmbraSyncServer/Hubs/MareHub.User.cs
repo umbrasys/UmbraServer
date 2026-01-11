@@ -233,6 +233,14 @@ public partial class MareHub
         {
             rpData = await DbContext.CharacterRpProfiles.SingleOrDefaultAsync(u => u.UserUID == user.User.UID && u.CharacterName == user.CharacterName && u.WorldId == user.WorldId).ConfigureAwait(false);
         }
+        else
+        {
+            rpData = await DbContext.CharacterRpProfiles
+                .Where(u => u.UserUID == user.User.UID)
+                .OrderByDescending(u => u.Id)
+                .FirstOrDefaultAsync()
+                .ConfigureAwait(false);
+        }
 
         if (hrpData == null && rpData == null) return new UserProfileDto(user.User, false, null, null, null);
 
@@ -244,7 +252,7 @@ public partial class MareHub
             rpData?.RpFirstName, rpData?.RpLastName, rpData?.RpTitle, rpData?.RpAge,
             rpData?.RpHeight, rpData?.RpBuild, rpData?.RpOccupation, rpData?.RpAffiliation,
             rpData?.RpAlignment, rpData?.RpAdditionalInfo,
-            user.CharacterName, user.WorldId);
+            rpData?.CharacterName, rpData?.WorldId);
     }
 
     [Authorize(Policy = "Identified")]
