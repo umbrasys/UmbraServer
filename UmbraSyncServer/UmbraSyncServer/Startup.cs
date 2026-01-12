@@ -105,6 +105,8 @@ public class Startup
 
     services.AddSingleton<GPoseLobbyDistributionService>();
     services.AddHostedService(provider => provider.GetService<GPoseLobbyDistributionService>());
+    services.AddSingleton<OnlineSyncedPairCacheService>();
+    services.AddSingleton<ConcurrencyFilter>();
     services.AddSingleton(TimeProvider.System);
     services.AddSingleton<AutoDetectScheduleCache>();
     services.AddHostedService<AutoDetectScheduleService>();
@@ -124,6 +126,7 @@ public class Startup
             hubOptions.KeepAliveInterval = TimeSpan.FromSeconds(15);
 
             hubOptions.AddFilter<SignalRLimitFilter>();
+            hubOptions.AddFilter<ConcurrencyFilter>();
         }).AddMessagePackProtocol(opt =>
         {
             var resolver = CompositeResolver.Create(StandardResolverAllowPrivate.Instance,
@@ -289,6 +292,9 @@ public class Startup
             MetricsAPI.CounterAuthenticationFailures,
             MetricsAPI.CounterAuthenticationRequests,
             MetricsAPI.CounterAuthenticationSuccesses,
+            MetricsAPI.CounterPairCacheHit,
+            MetricsAPI.CounterPairCacheMiss,
+            MetricsAPI.CounterHubConcurrencyRejected,
         }, new List<string>
         {
             MetricsAPI.GaugeAuthorizedConnections,
@@ -302,7 +308,11 @@ public class Startup
             MetricsAPI.GaugeGroupPairsPaused,
             MetricsAPI.GaugeUsersRegistered,
             MetricsAPI.GaugeGposeLobbies,
-            MetricsAPI.GaugeGposeLobbyUsers
+            MetricsAPI.GaugeGposeLobbyUsers,
+            MetricsAPI.GaugePairCacheUsers,
+            MetricsAPI.GaugePairCacheEntries,
+            MetricsAPI.GaugeHubConcurrencyAvailable,
+            MetricsAPI.GaugeHubConcurrencyQueued
         }));
     }
 

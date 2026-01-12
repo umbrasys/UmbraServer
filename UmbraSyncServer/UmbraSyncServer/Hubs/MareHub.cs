@@ -32,6 +32,7 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
     private readonly int _absoluteMaxGroupUserCount;
     private readonly IRedisDatabase _redis;
     private readonly GPoseLobbyDistributionService _gPoseLobbyDistributionService;
+    private readonly OnlineSyncedPairCacheService _pairCacheService;
     private readonly Uri _fileServerAddress;
     private readonly Version _expectedClientVersion;
     private readonly int _maxCharaDataByUser;
@@ -45,7 +46,7 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
         IDbContextFactory<MareDbContext> mareDbContextFactory, ILogger<MareHub> logger, SystemInfoService systemInfoService,
         IConfigurationService<ServerConfiguration> configuration, IHttpContextAccessor contextAccessor,
         IRedisDatabase redisDb, GPoseLobbyDistributionService gPoseLobbyDistributionService,
-        AutoDetectScheduleCache autoDetectScheduleCache)
+        AutoDetectScheduleCache autoDetectScheduleCache, OnlineSyncedPairCacheService pairCacheService)
     {
         _mareMetrics = mareMetrics;
         _systemInfoService = systemInfoService;
@@ -61,6 +62,7 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
         _contextAccessor = contextAccessor;
         _redis = redisDb;
         _gPoseLobbyDistributionService = gPoseLobbyDistributionService;
+        _pairCacheService = pairCacheService;
         _autoDetectScheduleCache = autoDetectScheduleCache;
         _logger = new MareHubLogger(this, logger);
         _dbContextLazy = new Lazy<MareDbContext>(() => mareDbContextFactory.CreateDbContext());
@@ -141,6 +143,7 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
         {
             _logger.LogCallInfo(MareHubLogger.Args(_contextAccessor.GetIpAddress(), UserCharaIdent));
 
+            await _pairCacheService.InitPlayer(UserUID).ConfigureAwait(false);
             await UpdateUserOnRedis().ConfigureAwait(false);
             try
             {
@@ -199,6 +202,7 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
                         await GposeLobbyLeave().ConfigureAwait(false);
                         await RemoveUserFromRedis().ConfigureAwait(false);
                         await SendOfflineToAllPairedUsers().ConfigureAwait(false);
+                        await _pairCacheService.DisposePlayer(UserUID).ConfigureAwait(false);
                     }
                     else
                     {
