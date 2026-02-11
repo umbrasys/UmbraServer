@@ -12,4 +12,5 @@ public class GroupPair
     public bool DisableSounds { get; set; }
     public bool DisableAnimations { get; set; }
     public bool DisableVFX { get; set; }
+    public bool CanPlacePings { get; set; }
 }

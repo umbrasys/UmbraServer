@@ -607,6 +607,10 @@ namespace MareSynchronosServer.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_pinned");
 
+                    b.Property<bool>("CanPlacePings")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_place_pings");
+
                     b.HasKey("GroupGID", "GroupUserUID")
                         .HasName("pk_group_pairs");
 
@@ -617,6 +621,43 @@ namespace MareSynchronosServer.Migrations
                         .HasDatabaseName("ix_group_pairs_group_user_uid");
 
                     b.ToTable("group_pairs", (string)null);
+                });
+
+            modelBuilder.Entity("MareSynchronosShared.Models.GroupProfile", b =>
+                {
+                    b.Property<string>("GroupGID")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("group_gid");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<string[]>("Tags")
+                        .HasColumnType("text[]")
+                        .HasColumnName("tags");
+
+                    b.Property<string>("Base64ProfileImage")
+                        .HasColumnType("text")
+                        .HasColumnName("base64profile_image");
+
+                    b.Property<string>("Base64BannerImage")
+                        .HasColumnType("text")
+                        .HasColumnName("base64banner_image");
+
+                    b.Property<bool>("IsNSFW")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_nsfw");
+
+                    b.Property<bool>("IsDisabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_disabled");
+
+                    b.HasKey("GroupGID")
+                        .HasName("pk_group_profiles");
+
+                    b.ToTable("group_profiles", (string)null);
                 });
 
             modelBuilder.Entity("MareSynchronosShared.Models.GroupTempInvite", b =>
@@ -1093,6 +1134,18 @@ namespace MareSynchronosServer.Migrations
                     b.Navigation("Group");
 
                     b.Navigation("GroupUser");
+                });
+
+            modelBuilder.Entity("MareSynchronosShared.Models.GroupProfile", b =>
+                {
+                    b.HasOne("MareSynchronosShared.Models.Group", "Group")
+                        .WithOne()
+                        .HasForeignKey("MareSynchronosShared.Models.GroupProfile", "GroupGID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_group_profiles_groups_group_gid");
+
+                    b.Navigation("Group");
                 });
 
             modelBuilder.Entity("MareSynchronosShared.Models.GroupTempInvite", b =>

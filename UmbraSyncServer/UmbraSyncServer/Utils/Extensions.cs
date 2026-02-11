@@ -76,6 +76,7 @@ namespace MareSynchronosServer.Utils
             var groupUserInfo = GroupUserInfo.None;
             groupUserInfo.SetPinned(groupPair.IsPinned);
             groupUserInfo.SetModerator(groupPair.IsModerator);
+            groupUserInfo.SetCanPlacePings(groupPair.CanPlacePings);
             return groupUserInfo;
         }
     }
