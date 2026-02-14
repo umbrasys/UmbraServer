@@ -237,7 +237,8 @@ public partial class MareHub
         {
             rpData = await DbContext.CharacterRpProfiles
                 .Where(u => u.UserUID == user.User.UID)
-                .OrderByDescending(u => u.Id)
+                .OrderByDescending(u => !string.IsNullOrEmpty(u.RpFirstName) ? 1 : 0)
+                .ThenByDescending(u => u.Id)
                 .FirstOrDefaultAsync()
                 .ConfigureAwait(false);
         }
