@@ -251,7 +251,8 @@ public partial class MareHub
         return new UserProfileDto(user.User, false, hrpData?.IsNSFW, hrpData?.Base64ProfileImage, hrpData?.UserDescription,
             rpData?.RpProfilePictureBase64, rpData?.RpDescription, rpData?.IsRpNSFW,
             rpData?.RpFirstName, rpData?.RpLastName, rpData?.RpTitle, rpData?.RpAge,
-            rpData?.RpHeight, rpData?.RpBuild, rpData?.RpOccupation, rpData?.RpAffiliation,
+            rpData?.RpRace, rpData?.RpEthnicity,
+            rpData?.RpHeight, rpData?.RpBuild, rpData?.RpResidence, rpData?.RpOccupation, rpData?.RpAffiliation,
             rpData?.RpAlignment, rpData?.RpAdditionalInfo,
             rpData?.CharacterName, rpData?.WorldId);
     }
@@ -580,8 +581,11 @@ public partial class MareHub
                 if (dto.RpLastName != null) existingRpData.RpLastName = dto.RpLastName;
                 if (dto.RpTitle != null) existingRpData.RpTitle = dto.RpTitle;
                 if (dto.RpAge != null) existingRpData.RpAge = dto.RpAge;
+                if (dto.RpRace != null) existingRpData.RpRace = dto.RpRace;
+                if (dto.RpEthnicity != null) existingRpData.RpEthnicity = dto.RpEthnicity;
                 if (dto.RpHeight != null) existingRpData.RpHeight = dto.RpHeight;
                 if (dto.RpBuild != null) existingRpData.RpBuild = dto.RpBuild;
+                if (dto.RpResidence != null) existingRpData.RpResidence = dto.RpResidence;
                 if (dto.RpOccupation != null) existingRpData.RpOccupation = dto.RpOccupation;
                 if (dto.RpAffiliation != null) existingRpData.RpAffiliation = dto.RpAffiliation;
                 if (dto.RpAlignment != null) existingRpData.RpAlignment = dto.RpAlignment;
@@ -601,8 +605,11 @@ public partial class MareHub
                     RpLastName = dto.RpLastName ?? null,
                     RpTitle = dto.RpTitle ?? null,
                     RpAge = dto.RpAge ?? null,
+                    RpRace = dto.RpRace ?? null,
+                    RpEthnicity = dto.RpEthnicity ?? null,
                     RpHeight = dto.RpHeight ?? null,
                     RpBuild = dto.RpBuild ?? null,
+                    RpResidence = dto.RpResidence ?? null,
                     RpOccupation = dto.RpOccupation ?? null,
                     RpAffiliation = dto.RpAffiliation ?? null,
                     RpAlignment = dto.RpAlignment ?? null,
