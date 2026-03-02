@@ -92,7 +92,7 @@ public sealed class ScalewayStorageService : IHostedService, IDisposable
         _logger.LogDebug("Queued file {Hash} for Scaleway upload, queue size: {Size}", hash, _uploadQueue.Count);
     }
 
-    public async Task<bool> FileExistsAsync(string hash, CancellationToken ct = default)
+    public async Task<bool> FileExistsAsync(string hash, long expectedSize, CancellationToken ct = default)
     {
         if (!IsEnabled || _s3Client == null) return false;
 
@@ -101,7 +101,13 @@ public sealed class ScalewayStorageService : IHostedService, IDisposable
 
         try
         {
-            await _s3Client.GetObjectMetadataAsync(bucketName, key, ct).ConfigureAwait(false);
+            var metadata = await _s3Client.GetObjectMetadataAsync(bucketName, key, ct).ConfigureAwait(false);
+            if (metadata.ContentLength != expectedSize)
+            {
+                _logger.LogWarning("S3 size mismatch for {Hash}: expected {Expected} bytes, got {Actual} bytes on S3",
+                    hash, expectedSize, metadata.ContentLength);
+                return false;
+            }
             return true;
         }
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -173,9 +179,10 @@ public sealed class ScalewayStorageService : IHostedService, IDisposable
                 return;
             }
 
-            if (await FileExistsAsync(hash, ct).ConfigureAwait(false))
+            var localSize = new FileInfo(filePath).Length;
+            if (await FileExistsAsync(hash, localSize, ct).ConfigureAwait(false))
             {
-                _logger.LogDebug("File {Hash} already exists on S3, skipping upload", hash);
+                _logger.LogDebug("File {Hash} already exists on S3 with correct size, skipping upload", hash);
                 return;
             }
 
@@ -320,8 +327,8 @@ public sealed class ScalewayStorageService : IHostedService, IDisposable
 
         _logger.LogInformation("Starting periodic S3 sync scan of {Dir}", cacheDir);
 
-        // Récupérer tous les objets présents sur S3
-        var s3Keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // Récupérer tous les objets présents sur S3 avec leurs tailles
+        var s3Objects = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         try
         {
             string? continuationToken = null;
@@ -340,7 +347,7 @@ public sealed class ScalewayStorageService : IHostedService, IDisposable
                     // La clé est au format "{char}/{hash}", extraire le hash
                     var slashIdx = obj.Key.IndexOf('/');
                     var hash = slashIdx >= 0 ? obj.Key[(slashIdx + 1)..] : obj.Key;
-                    s3Keys.Add(hash);
+                    s3Objects[hash] = obj.Size;
                 }
 
                 continuationToken = response.IsTruncated ? response.NextContinuationToken : null;
@@ -352,10 +359,16 @@ public sealed class ScalewayStorageService : IHostedService, IDisposable
             return;
         }
 
-        _logger.LogInformation("S3 sync scan: {S3Count} objects found on S3", s3Keys.Count);
+        _logger.LogInformation("S3 sync scan: {S3Count} objects found on S3", s3Objects.Count);
 
-        // Scanner les fichiers locaux et trouver ceux manquants sur S3
-        int queued = 0;
+        // Scanner les fichiers locaux et comparer existence + taille
+        int totalScanned = 0;
+        int missing = 0;
+        int sizeMismatch = 0;
+        int inSync = 0;
+        int skippedTemp = 0;
+        int skippedPending = 0;
+
         foreach (var subDir in Directory.EnumerateDirectories(cacheDir))
         {
             ct.ThrowIfCancellationRequested();
@@ -369,21 +382,44 @@ public sealed class ScalewayStorageService : IHostedService, IDisposable
                 // Ignorer les fichiers temporaires (uploads en cours)
                 if (hash.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)
                     || hash.EndsWith(".dl", StringComparison.OrdinalIgnoreCase))
+                {
+                    skippedTemp++;
                     continue;
+                }
 
-                // Ignorer si déjà sur S3 ou déjà dans la queue
-                if (s3Keys.Contains(hash)) continue;
-                if (_pendingUploads.ContainsKey(hash)) continue;
+                totalScanned++;
 
-                QueueUpload(hash, filePath);
-                queued++;
+                if (_pendingUploads.ContainsKey(hash))
+                {
+                    skippedPending++;
+                    continue;
+                }
+
+                if (!s3Objects.TryGetValue(hash, out var s3Size))
+                {
+                    missing++;
+                    QueueUpload(hash, filePath);
+                    continue;
+                }
+
+                var localSize = new FileInfo(filePath).Length;
+                if (s3Size != localSize)
+                {
+                    sizeMismatch++;
+                    _logger.LogWarning("S3 sync scan: size mismatch for {Hash} (local: {LocalSize} bytes, S3: {S3Size} bytes), re-queuing",
+                        hash, localSize, s3Size);
+                    QueueUpload(hash, filePath);
+                    continue;
+                }
+
+                inSync++;
             }
         }
 
-        if (queued > 0)
-            _logger.LogWarning("S3 sync scan: queued {Count} missing files for upload", queued);
-        else
-            _logger.LogInformation("S3 sync scan: all local files are in sync with S3");
+        var queued = missing + sizeMismatch;
+        _logger.LogInformation(
+            "S3 sync scan complete: {Total} files scanned, {InSync} in sync, {Missing} missing, {SizeMismatch} size mismatch, {SkippedTemp} temp skipped, {SkippedPending} pending skipped, {Queued} queued for upload",
+            totalScanned, inSync, missing, sizeMismatch, skippedTemp, skippedPending, queued);
     }
 
     private static string GetS3Key(string hash)
