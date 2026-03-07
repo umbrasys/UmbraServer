@@ -199,7 +199,41 @@ public partial class MareHub
         var self = await DbContext.Users.AsNoTracking().SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
         await Clients.Users(usersToSendDataTo).Client_UserSendOffline(new(self.ToUserData())).ConfigureAwait(false);
 
+        // Also notify one-way pair partners (not covered by GetAllPairedUnpausedUsers which requires bidirectional pairs)
+        await SendOfflineToOneWayPairPartners(self, usersToSendDataTo).ConfigureAwait(false);
+
         return usersToSendDataTo;
+    }
+
+    private async Task SendOfflineToOneWayPairPartners(User self, List<string> alreadyNotified)
+    {
+        var alreadyNotifiedSet = new HashSet<string>(alreadyNotified, StringComparer.Ordinal);
+
+        // Users who have paired with us (they have an entry where OtherUserUID == our UID)
+        // but we haven't paired them back (no reverse entry)
+        var incomingOnlyUids = await (from cp in DbContext.ClientPairs
+                                      where cp.OtherUserUID == self.UID
+                                      && !DbContext.ClientPairs.Any(r => r.UserUID == self.UID && r.OtherUserUID == cp.UserUID)
+                                      select cp.UserUID)
+                                      .AsNoTracking().ToListAsync().ConfigureAwait(false);
+
+        // Users we have paired (we have an entry where OtherUserUID == their UID)
+        // but they haven't paired us back (no reverse entry)
+        var outgoingOnlyUids = await (from cp in DbContext.ClientPairs
+                                      where cp.UserUID == self.UID
+                                      && !DbContext.ClientPairs.Any(r => r.UserUID == cp.OtherUserUID && r.OtherUserUID == self.UID)
+                                      select cp.OtherUserUID)
+                                      .AsNoTracking().ToListAsync().ConfigureAwait(false);
+
+        var oneWayUids = incomingOnlyUids.Concat(outgoingOnlyUids)
+            .Where(uid => !alreadyNotifiedSet.Contains(uid))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (oneWayUids.Count > 0)
+        {
+            await Clients.Users(oneWayUids).Client_UserSendOffline(new(self.ToUserData())).ConfigureAwait(false);
+        }
     }
 
     private async Task<List<string>> SendOnlineToAllPairedUsers()

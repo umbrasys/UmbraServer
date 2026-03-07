@@ -75,10 +75,11 @@ public class ServerFilesController : ControllerBase
         var cacheFiles = await _mareDbContext.Files
             .AsNoTracking()
             .Where(f => requested.Contains(f.Hash))
-            .Select(k => new { k.Hash, k.Size })
+            .Select(k => new { k.Hash, k.Size, k.UploadDate })
             .ToListAsync().ConfigureAwait(false);
 
         var cacheDict = cacheFiles.ToDictionary(k => k.Hash, k => k.Size, StringComparer.OrdinalIgnoreCase);
+        var uploadDateDict = cacheFiles.ToDictionary(k => k.Hash, k => k.UploadDate, StringComparer.OrdinalIgnoreCase);
         var forbiddenDict = forbiddenFiles.ToDictionary(f => f.Hash, f => f, StringComparer.OrdinalIgnoreCase);
         var shardsConfig = _configuration.GetValueOrDefault<ICollection<CdnShardConfiguration>>(
             nameof(StaticFilesServerConfiguration.CdnShardConfiguration),
@@ -97,10 +98,13 @@ public class ServerFilesController : ControllerBase
             catch { return false; }
         }
 
+        var recentUploadCutoff = DateTime.UtcNow - TimeSpan.FromMinutes(20);
+
         string BuildDirectDownloadUrl(string hash)
         {
             if (!_scalewayStorage.IsEnabled) return string.Empty;
             if (_scalewayStorage.IsPendingUpload(hash)) return string.Empty;
+            if (uploadDateDict.TryGetValue(hash, out var uploadDate) && uploadDate > recentUploadCutoff) return string.Empty;
             var cdnUrl = DefaultCdnUrlSafely()?.ToString().TrimEnd('/');
             if (string.IsNullOrEmpty(cdnUrl)) return string.Empty;
             return $"{cdnUrl}/{hash[0]}/{hash}";
