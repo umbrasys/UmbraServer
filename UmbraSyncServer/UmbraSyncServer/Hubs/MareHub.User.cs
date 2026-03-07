@@ -79,6 +79,12 @@ public partial class MareHub
         var userPairResponse = new UserPairDto(otherUser.ToUserData(), ownPerm, otherPerm);
         await Clients.User(user.UID).Client_UserAddClientPair(userPairResponse).ConfigureAwait(false);
 
+        // notify the other user of the incoming pair request (one-way pairing)
+        if (otherEntry == null && otherIdent != null)
+        {
+            await Clients.User(otherUser.UID).Client_ReceivePairRequest(new UserDto(user.ToUserData())).ConfigureAwait(false);
+        }
+
         // check if other user is online
         if (otherIdent == null || otherEntry == null) return;
 

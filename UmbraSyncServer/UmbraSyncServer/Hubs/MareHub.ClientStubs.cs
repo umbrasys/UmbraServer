@@ -36,6 +36,8 @@ namespace MareSynchronosServer.Hubs
 
         public Task Client_UserAddClientPair(UserPairDto dto) => throw new PlatformNotSupportedException("Calling clientside method on server not supported");
 
+        public Task Client_ReceivePairRequest(UserDto requester) => throw new PlatformNotSupportedException("Calling clientside method on server not supported");
+
         public Task Client_UserReceiveCharacterData(OnlineUserCharaDataDto dataDto) => throw new PlatformNotSupportedException("Calling clientside method on server not supported");
 
         public Task Client_UserReceiveUploadStatus(UserDto dto) => throw new PlatformNotSupportedException("Calling clientside method on server not supported");

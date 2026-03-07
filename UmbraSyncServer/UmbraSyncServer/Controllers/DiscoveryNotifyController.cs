@@ -34,7 +34,9 @@ public class DiscoveryNotifyController : Controller
         var name = string.IsNullOrEmpty(dto.FromAlias) ? dto.FromUid : dto.FromAlias;
         var msg = $"Nearby Request: {name} [{dto.FromUid}]";
         _logger.LogInformation("Discovery notify request to {target} from {from}", dto.TargetUid, name);
-        await _hub.Clients.User(dto.TargetUid).Client_ReceiveServerMessage(UmbraSync.API.Data.Enum.MessageSeverity.Information, msg);
+        var client = _hub.Clients.User(dto.TargetUid);
+        await client.Client_ReceiveServerMessage(UmbraSync.API.Data.Enum.MessageSeverity.Information, msg);
+        await client.Client_ReceivePairRequest(new UmbraSync.API.Dto.User.UserDto(new UmbraSync.API.Data.UserData(dto.FromUid, dto.FromAlias)));
         return Accepted();
     }
 
