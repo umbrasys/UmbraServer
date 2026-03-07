@@ -267,6 +267,58 @@ public partial class MareHub
     }
 
     [Authorize(Policy = "Identified")]
+    public async Task<List<UserProfileDto>> UserGetAllCharacterProfiles(UserDto user)
+    {
+        _logger.LogCallInfo(MareHubLogger.Args(user));
+
+        // Anti-stalk: the caller must provide the CharacterName+WorldId of the character they encountered
+        if (string.IsNullOrEmpty(user.CharacterName) || !user.WorldId.HasValue || user.WorldId.Value == 0)
+        {
+            return [];
+        }
+
+        var allUserPairs = await GetAllPairedUnpausedUsers().ConfigureAwait(false);
+
+        if (!allUserPairs.Contains(user.User.UID) && !string.Equals(user.User.UID, UserUID, StringComparison.Ordinal))
+        {
+            return [];
+        }
+
+        // Anti-stalk: verify that the claimed encountered character actually exists in DB for this UID
+        var encounteredExists = await DbContext.CharacterRpProfiles
+            .AnyAsync(u => u.UserUID == user.User.UID && u.CharacterName == user.CharacterName && u.WorldId == user.WorldId)
+            .ConfigureAwait(false);
+
+        if (!encounteredExists)
+        {
+            return [];
+        }
+
+        var hrpData = await DbContext.UserProfileData.SingleOrDefaultAsync(u => u.UserUID == user.User.UID).ConfigureAwait(false);
+
+        if (hrpData?.FlaggedForReport ?? false) return [];
+        if (hrpData?.ProfileDisabled ?? false) return [];
+
+        var rpProfiles = await DbContext.CharacterRpProfiles
+            .Where(u => u.UserUID == user.User.UID)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        if (rpProfiles.Count == 0 && hrpData == null) return [];
+
+        return rpProfiles.Select(rpData => new UserProfileDto(user.User, false, hrpData?.IsNSFW, hrpData?.Base64ProfileImage, hrpData?.UserDescription,
+            rpData.RpProfilePictureBase64, rpData.RpDescription, rpData.IsRpNSFW,
+            rpData.RpFirstName, rpData.RpLastName, rpData.RpTitle, rpData.RpAge,
+            rpData.RpRace, rpData.RpEthnicity,
+            rpData.RpHeight, rpData.RpBuild, rpData.RpResidence, rpData.RpOccupation, rpData.RpAffiliation,
+            rpData.RpAlignment, rpData.RpAdditionalInfo,
+            rpData.RpNameColor,
+            rpData.RpCustomFields,
+            rpData.MoodlesData,
+            rpData.CharacterName, rpData.WorldId)).ToList();
+    }
+
+    [Authorize(Policy = "Identified")]
     public async Task UserPushData(UserCharaDataMessageDto dto)
     {
         _logger.LogCallInfo(MareHubLogger.Args(dto.CharaData.FileReplacements.Count));
