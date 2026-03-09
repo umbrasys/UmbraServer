@@ -13,6 +13,7 @@ public class MareConfigurationBase : IMareConfiguration
     public Uri MainServerAddress { get; set; }
     public int RedisPool { get; set; } = 50;
     public int MetricsPort { get; set; }
+    [SensitiveConfiguration]
     public string RedisConnectionString { get; set; } = string.Empty;
     public string ShardName { get; set; } = string.Empty;
 
@@ -45,7 +46,7 @@ public class MareConfigurationBase : IMareConfiguration
         StringBuilder sb = new();
         sb.AppendLine(base.ToString());
         sb.AppendLine($"{nameof(MainServerAddress)} => {MainServerAddress}");
-        sb.AppendLine($"{nameof(RedisConnectionString)} => {RedisConnectionString}");
+        sb.AppendLine($"{nameof(RedisConnectionString)} => ***");
         sb.AppendLine($"{nameof(ShardName)} => {ShardName}");
         sb.AppendLine($"{nameof(DbContextPoolSize)} => {DbContextPoolSize}");
         return sb.ToString();

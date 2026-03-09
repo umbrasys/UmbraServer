@@ -33,15 +33,25 @@ public class MareConfigurationServiceServer<T> : IConfigurationService<T> where 
         foreach (var prop in props)
         {
             var isRemote = prop.GetCustomAttributes(typeof(RemoteConfigurationAttribute), true).Any();
-            var getValueMethod = GetType().GetMethod(nameof(GetValue)).MakeGenericMethod(prop.PropertyType);
-            var value = isRemote ? getValueMethod.Invoke(this, new[] { prop.Name }) : prop.GetValue(_config.CurrentValue);
-            if (typeof(IEnumerable).IsAssignableFrom(prop.PropertyType) && !typeof(string).IsAssignableFrom(prop.PropertyType))
+            var isSensitive = prop.GetCustomAttributes(typeof(SensitiveConfigurationAttribute), true).Any();
+
+            object value;
+            if (isSensitive)
             {
-                var enumVal = (IEnumerable)value;
-                value = string.Empty;
-                foreach (var listVal in enumVal)
+                value = "***";
+            }
+            else
+            {
+                var getValueMethod = GetType().GetMethod(nameof(GetValue)).MakeGenericMethod(prop.PropertyType);
+                value = isRemote ? getValueMethod.Invoke(this, new[] { prop.Name }) : prop.GetValue(_config.CurrentValue);
+                if (typeof(IEnumerable).IsAssignableFrom(prop.PropertyType) && !typeof(string).IsAssignableFrom(prop.PropertyType))
                 {
-                    value += listVal.ToString() + ", ";
+                    var enumVal = (IEnumerable)value;
+                    value = string.Empty;
+                    foreach (var listVal in enumVal)
+                    {
+                        value += listVal.ToString() + ", ";
+                    }
                 }
             }
             sb.AppendLine($"{prop.Name} (IsRemote: {isRemote}) => {value}");
