@@ -61,6 +61,8 @@ public class MareDbContext : DbContext
     public DbSet<HousingShare> HousingShares { get; set; }
     public DbSet<HousingShareAllowedUser> HousingShareAllowedUsers { get; set; }
     public DbSet<HousingShareAllowedGroup> HousingShareAllowedGroups { get; set; }
+    public DbSet<Establishment> Establishments { get; set; }
+    public DbSet<EstablishmentEvent> EstablishmentEvents { get; set; }
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -71,6 +73,7 @@ public class MareDbContext : DbContext
         ConfigureMcdfShareEntities(mb);
         ConfigureSlotEntities(mb);
         ConfigureHousingShareEntities(mb);
+        ConfigureEstablishmentEntities(mb);
     }
 
     private static void ConfigureSlotEntities(ModelBuilder mb)
@@ -241,5 +244,27 @@ public class MareDbContext : DbContext
         mb.Entity<HousingShareAllowedGroup>().ToTable("housing_share_allowed_groups");
         mb.Entity<HousingShareAllowedGroup>().HasKey(g => new { g.ShareId, g.AllowedGroupGid });
         mb.Entity<HousingShareAllowedGroup>().HasIndex(g => g.AllowedGroupGid);
+    }
+
+    private static void ConfigureEstablishmentEntities(ModelBuilder mb)
+    {
+        mb.Entity<Establishment>().ToTable("establishments");
+        mb.Entity<Establishment>().HasIndex(e => e.OwnerUID);
+        mb.Entity<Establishment>().HasIndex(e => new { e.TerritoryId, e.LocationType });
+        mb.Entity<Establishment>().HasOne(e => e.Owner).WithMany().HasForeignKey(e => e.OwnerUID).OnDelete(DeleteBehavior.Cascade);
+        mb.Entity<Establishment>().Property(e => e.Description).HasColumnType("text");
+        mb.Entity<Establishment>().Property(e => e.Languages).HasColumnType("text[]");
+        mb.Entity<Establishment>().Property(e => e.Tags).HasColumnType("text[]");
+        mb.Entity<Establishment>().Property(e => e.CreatedUtc).HasColumnType("timestamp with time zone");
+        mb.Entity<Establishment>().Property(e => e.UpdatedUtc).HasColumnType("timestamp with time zone");
+        mb.Entity<Establishment>().HasMany(e => e.Events).WithOne(ev => ev.Establishment)
+            .HasForeignKey(ev => ev.EstablishmentId).OnDelete(DeleteBehavior.Cascade);
+
+        mb.Entity<EstablishmentEvent>().ToTable("establishment_events");
+        mb.Entity<EstablishmentEvent>().HasIndex(e => e.EstablishmentId);
+        mb.Entity<EstablishmentEvent>().Property(e => e.Description).HasColumnType("text");
+        mb.Entity<EstablishmentEvent>().Property(e => e.StartsAtUtc).HasColumnType("timestamp with time zone");
+        mb.Entity<EstablishmentEvent>().Property(e => e.EndsAtUtc).HasColumnType("timestamp with time zone");
+        mb.Entity<EstablishmentEvent>().Property(e => e.CreatedUtc).HasColumnType("timestamp with time zone");
     }
 }

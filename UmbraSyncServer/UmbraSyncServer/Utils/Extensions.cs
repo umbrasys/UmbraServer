@@ -1,6 +1,7 @@
 ﻿using UmbraSync.API.Data;
 using UmbraSync.API.Data.Enum;
 using UmbraSync.API.Data.Extensions;
+using UmbraSync.API.Dto.Establishment;
 using UmbraSync.API.Dto.Slot;
 using MareSynchronosShared.Models;
 
@@ -32,6 +33,56 @@ namespace MareSynchronosServer.Utils
                     Gid = slot.GroupGID,
                     Name = slot.Group?.Alias ?? slot.GroupGID
                 }
+            };
+        }
+
+        public static EstablishmentDto ToEstablishmentDto(this Establishment establishment, string currentUserUID)
+        {
+            return new EstablishmentDto
+            {
+                Id = establishment.Id,
+                OwnerUID = establishment.OwnerUID,
+                OwnerAlias = establishment.Owner?.Alias,
+                Name = establishment.Name,
+                Description = establishment.Description,
+                Category = (int)establishment.Category,
+                Languages = establishment.Languages,
+                Tags = establishment.Tags,
+                FactionTag = establishment.FactionTag,
+                Schedule = establishment.Schedule,
+                IsPublic = establishment.IsPublic,
+                CreatedUtc = establishment.CreatedUtc,
+                UpdatedUtc = establishment.UpdatedUtc,
+                Location = new EstablishmentLocationDto
+                {
+                    LocationType = (int)establishment.LocationType,
+                    TerritoryId = establishment.TerritoryId,
+                    ServerId = establishment.ServerId,
+                    WardId = establishment.WardId,
+                    PlotId = establishment.PlotId,
+                    DivisionId = establishment.DivisionId,
+                    IsApartment = establishment.IsApartment,
+                    RoomId = establishment.RoomId,
+                    X = establishment.X,
+                    Y = establishment.Y,
+                    Z = establishment.Z,
+                    Radius = establishment.Radius
+                },
+                Events = establishment.Events?.Select(e => e.ToEstablishmentEventDto()).ToList() ?? []
+            };
+        }
+
+        public static EstablishmentEventDto ToEstablishmentEventDto(this EstablishmentEvent evt)
+        {
+            return new EstablishmentEventDto
+            {
+                Id = evt.Id,
+                EstablishmentId = evt.EstablishmentId,
+                Title = evt.Title,
+                Description = evt.Description,
+                StartsAtUtc = evt.StartsAtUtc,
+                EndsAtUtc = evt.EndsAtUtc,
+                CreatedUtc = evt.CreatedUtc
             };
         }
 
