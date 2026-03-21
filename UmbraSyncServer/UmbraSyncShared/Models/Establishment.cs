@@ -58,6 +58,10 @@ public class Establishment
     public float? Z { get; set; }
     public float? Radius { get; set; }
 
+    // Images
+    public string? LogoImageBase64 { get; set; }
+    public string? BannerImageBase64 { get; set; }
+
     public ICollection<EstablishmentEvent> Events { get; set; } = [];
 }
 

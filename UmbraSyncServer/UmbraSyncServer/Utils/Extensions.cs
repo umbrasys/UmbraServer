@@ -53,6 +53,8 @@ namespace MareSynchronosServer.Utils
                 IsPublic = establishment.IsPublic,
                 CreatedUtc = establishment.CreatedUtc,
                 UpdatedUtc = establishment.UpdatedUtc,
+                LogoImageBase64 = establishment.LogoImageBase64,
+                BannerImageBase64 = establishment.BannerImageBase64,
                 Location = new EstablishmentLocationDto
                 {
                     LocationType = (int)establishment.LocationType,

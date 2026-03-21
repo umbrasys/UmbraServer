@@ -34,6 +34,8 @@ public partial class MareHub
             FactionTag = request.FactionTag,
             Schedule = request.Schedule,
             IsPublic = request.IsPublic,
+            LogoImageBase64 = request.LogoImageBase64,
+            BannerImageBase64 = request.BannerImageBase64,
             CreatedUtc = now,
             UpdatedUtc = now,
             LocationType = (ModelEstablishmentLocationType)request.Location.LocationType,
@@ -78,6 +80,8 @@ public partial class MareHub
         establishment.FactionTag = request.FactionTag;
         establishment.Schedule = request.Schedule;
         establishment.IsPublic = request.IsPublic;
+        establishment.LogoImageBase64 = request.LogoImageBase64;
+        establishment.BannerImageBase64 = request.BannerImageBase64;
         establishment.UpdatedUtc = DateTime.UtcNow;
 
         if (request.Location != null)
