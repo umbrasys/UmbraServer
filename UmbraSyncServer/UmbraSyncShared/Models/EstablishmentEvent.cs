@@ -22,5 +22,6 @@ public class EstablishmentEvent
 
     public DateTime StartsAtUtc { get; set; }
     public DateTime? EndsAtUtc { get; set; }
+    public int Recurrence { get; set; }
     public DateTime CreatedUtc { get; set; }
 }

@@ -84,6 +84,7 @@ namespace MareSynchronosServer.Utils
                 Description = evt.Description,
                 StartsAtUtc = evt.StartsAtUtc,
                 EndsAtUtc = evt.EndsAtUtc,
+                Recurrence = evt.Recurrence,
                 CreatedUtc = evt.CreatedUtc
             };
         }

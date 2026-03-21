@@ -284,6 +284,7 @@ public partial class MareHub
             evt.Description = request.Description;
             evt.StartsAtUtc = request.StartsAtUtc;
             evt.EndsAtUtc = request.EndsAtUtc;
+            evt.Recurrence = request.Recurrence;
         }
         else
         {
@@ -294,6 +295,7 @@ public partial class MareHub
                 Description = request.Description,
                 StartsAtUtc = request.StartsAtUtc,
                 EndsAtUtc = request.EndsAtUtc,
+                Recurrence = request.Recurrence,
                 CreatedUtc = DateTime.UtcNow
             };
             DbContext.EstablishmentEvents.Add(evt);
