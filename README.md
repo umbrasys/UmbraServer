@@ -26,7 +26,7 @@ Le serveur est composé de 5 projets .NET et d'une bibliothèque de contrats par
 
 | Projet | Rôle |
 |---|---|
-| **UmbraSyncServer** | Hub SignalR principal (`/mare`) : synchronisation temps-réel, gestion des paires, Syncshells, profils, MCDF, housing, quêtes |
+| **UmbraSyncServer** | Hub SignalR principal (`/mare`) : synchronisation temps-réel, gestion des paires, Syncshells, profils, MCDF, housing, quêtes, établissements RP |
 | **UmbraSyncAuthService** | Authentification JWT, enregistrement de comptes, rate limiting, géo-IP, discovery |
 | **UmbraSyncStaticFilesServer** | CDN et distribution de fichiers : cache, upload/download, stockage cloud (Scaleway) |
 | **UmbraSyncServices** | Services background : bot Discord (commandes, notifications) |
@@ -70,6 +70,7 @@ UmbraSyncServer/                    # Hub SignalR principal
 │   ├── MareHub.McdfShare.cs        # Partage de mods chiffré
 │   ├── MareHub.Typing.cs           # Indicateurs de saisie
 │   ├── MareHub.QuestSync.cs        # Synchronisation de quêtes
+│   ├── MareHub.Establishments.cs   # Établissements RP (CRUD, événements, images, gérant)
 │   ├── MareHub.HousingShare.cs     # Partage de housing
 │   ├── MareHub.Rgpd.cs             # Export/suppression RGPD
 │   └── ...
@@ -93,7 +94,7 @@ UmbraSyncServices/                  # Services background
 UmbraSyncShared/                    # Bibliothèque partagée
 ├── Data/
 │   └── MareDbContext.cs            # DbContext EF Core
-├── Models/                         # 21 entités (User, ClientPair, Group, CharaData, etc.)
+├── Models/                         # 23 entités (User, ClientPair, Group, CharaData, Establishment, etc.)
 ├── Migrations/                     # 34 migrations
 ├── Utils/
 │   └── Configuration/              # 8 classes de configuration
@@ -109,7 +110,7 @@ UmbraSyncShared/                    # Bibliothèque partagée
 
 **Path** : `/mare` &middot; **API** : `v3000` &middot; **Sérialisation** : MessagePack + LZ4
 
-Le hub implémente `IMareHub` (88 méthodes serveur) et envoie des callbacks via `IMareHubClient` (30 méthodes client).
+Le hub implémente `IMareHub` (97+ méthodes serveur) et envoie des callbacks via `IMareHubClient` (30 méthodes client).
 
 | Domaine | Exemples de méthodes |
 |---|---|
@@ -123,6 +124,7 @@ Le hub implémente `IMareHub` (88 méthodes serveur) et envoie des callbacks via
 | Slots | `SlotGetInfo`, `SlotGetNearby`, `SlotUpdate`, `SlotJoin` |
 | Housing | `HousingShareUpload`, `HousingShareDownload` |
 | Quêtes | `QuestSessionCreate`, `QuestSessionJoin`, `QuestSessionPushState` |
+| Établissements | `EstablishmentCreate`, `EstablishmentUpdate`, `EstablishmentList`, `EstablishmentGetById`, `EstablishmentGetByOwner`, `EstablishmentGetNearby`, `EstablishmentEventUpsert`, `EstablishmentEventDelete`, `EstablishmentGetOwnRpProfiles` |
 | RGPD | `UserRgpdExportData`, `UserRgpdDeleteAllData` |
 
 ---
@@ -142,6 +144,8 @@ Le hub implémente `IMareHub` (88 méthodes serveur) et envoie des callbacks via
 | `CharaData` | Données d'apparence uploadées avec contrôle d'accès |
 | `UserProfileData` | Profil HRP (avatar, description) |
 | `CharacterRpProfileData` | Profil RP par personnage (prénom, titre, race, etc.) |
+| `Establishment` | Établissement RP (nom, catégorie, localisation, images, gérant) |
+| `EstablishmentEvent` | Événement d'établissement (date, récurrence, description) |
 | `HousingShare` | Layout de housing partagé |
 | `McdfShare` | Fichier mod chiffré partagé |
 | `AutoDetectSchedule` | Planification de la détection automatique |

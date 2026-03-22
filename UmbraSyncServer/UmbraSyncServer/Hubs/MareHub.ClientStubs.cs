@@ -68,5 +68,6 @@ namespace MareSynchronosServer.Hubs
         public Task Client_QuestSessionStateUpdate(UserData sender, QuestSessionStateDto state) => throw new PlatformNotSupportedException("Calling clientside method on server not supported");
         public Task Client_QuestSessionEventTriggered(UserData sender, QuestEventTriggerDto trigger) => throw new PlatformNotSupportedException("Calling clientside method on server not supported");
         public Task Client_QuestSessionBranchingChoice(UserData sender, QuestBranchingChoiceDto choice) => throw new PlatformNotSupportedException("Calling clientside method on server not supported");
+        public Task Client_McdfShareReceived(string ownerUid, string description) => throw new PlatformNotSupportedException("Calling clientside method on server not supported");
     }
 }

@@ -120,6 +120,26 @@ public partial class MareHub
         }
 
         await DbContext.SaveChangesAsync().ConfigureAwait(false);
+
+        // Notify recipients
+        var recipientUids = new HashSet<string>(normalizedUsers, StringComparer.OrdinalIgnoreCase);
+        foreach (var gid in normalizedGroups)
+        {
+            var members = await DbContext.GroupPairs
+                .Where(p => p.GroupGID == gid)
+                .Select(p => p.GroupUserUID)
+                .ToListAsync().ConfigureAwait(false);
+            foreach (var m in members) recipientUids.Add(m);
+        }
+        recipientUids.Remove(UserUID);
+
+        if (recipientUids.Count > 0)
+        {
+            await Clients.Users(recipientUids.ToList())
+                .Client_McdfShareReceived(UserUID, share.Description)
+                .ConfigureAwait(false);
+        }
+
         return true;
     }
 
