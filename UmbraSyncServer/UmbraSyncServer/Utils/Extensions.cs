@@ -150,6 +150,7 @@ namespace MareSynchronosServer.Utils
                 CharacterName = announcement.CharacterName,
                 WorldId = announcement.WorldId,
                 TerritoryId = announcement.TerritoryId,
+                WardId = announcement.WardId,
                 Message = announcement.Message,
                 RpTitle = announcement.RpProfile?.RpTitle,
                 RpFirstName = announcement.RpProfile?.RpFirstName,

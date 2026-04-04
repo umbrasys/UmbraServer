@@ -37,6 +37,7 @@ public partial class MareHub
             UserUID = UserUID,
             WorldId = request.WorldId,
             TerritoryId = request.TerritoryId,
+            WardId = request.WardId is > 0 ? request.WardId : null,
             CharacterName = characterName,
             Message = message,
             RpProfileId = request.RpProfileId,
