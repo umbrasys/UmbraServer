@@ -156,6 +156,7 @@ namespace MareSynchronosServer.Utils
                 RpFirstName = announcement.RpProfile?.RpFirstName,
                 RpLastName = announcement.RpProfile?.RpLastName,
                 RpProfilePictureBase64 = announcement.RpProfile?.RpProfilePictureBase64,
+                RpLevel = announcement.RpProfile?.RpLevel ?? 0,
                 CreatedAtUtc = announcement.CreatedAtUtc,
                 ExpiresAtUtc = announcement.ExpiresAtUtc
             };

@@ -36,4 +36,5 @@ public class CharacterRpProfileData
     public string? RpCustomFields { get; set; }
     public string? MoodlesData { get; set; }
     public ushort ChatIcon { get; set; }
+    public byte RpLevel { get; set; }
 }
