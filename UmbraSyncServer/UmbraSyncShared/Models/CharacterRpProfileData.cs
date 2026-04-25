@@ -35,5 +35,5 @@ public class CharacterRpProfileData
     public string? RpNameColor { get; set; }
     public string? RpCustomFields { get; set; }
     public string? MoodlesData { get; set; }
-    public uint ProfileIconId { get; set; }
+    public ushort ChatIcon { get; set; }
 }

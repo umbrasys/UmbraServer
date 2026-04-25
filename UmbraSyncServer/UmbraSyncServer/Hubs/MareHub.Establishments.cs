@@ -179,7 +179,7 @@ public partial class MareHub
         var page = Math.Max(request.Page, 0);
 
         var establishments = await query
-            .OrderByDescending(e => e.UpdatedUtc)
+            .OrderBy(e => e.Name.ToLower())
             .Skip(page * pageSize)
             .Take(pageSize)
             .ToListAsync()

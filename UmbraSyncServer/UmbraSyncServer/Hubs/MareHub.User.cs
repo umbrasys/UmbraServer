@@ -272,7 +272,7 @@ public partial class MareHub
             rpData?.RpNameColor,
             rpData?.RpCustomFields,
             rpData?.MoodlesData,
-            rpData?.ProfileIconId,
+            rpData?.ChatIcon,
             rpData?.CharacterName, rpData?.WorldId);
     }
 
@@ -325,7 +325,7 @@ public partial class MareHub
             rpData.RpNameColor,
             rpData.RpCustomFields,
             rpData.MoodlesData,
-            rpData.ProfileIconId,
+            rpData.ChatIcon,
             rpData.CharacterName, rpData.WorldId)).ToList();
     }
 
@@ -674,7 +674,7 @@ public partial class MareHub
                 if (dto.RpNameColor != null) existingRpData.RpNameColor = dto.RpNameColor;
                 if (dto.RpCustomFields != null) existingRpData.RpCustomFields = dto.RpCustomFields;
                 if (dto.MoodlesData != null) existingRpData.MoodlesData = dto.MoodlesData;
-                if (dto.ProfileIconId.HasValue) existingRpData.ProfileIconId = dto.ProfileIconId.Value;
+                if (dto.ChatIcon.HasValue) existingRpData.ChatIcon = dto.ChatIcon.Value;
             }
             else
             {
@@ -702,7 +702,7 @@ public partial class MareHub
                     RpNameColor = dto.RpNameColor ?? null,
                     RpCustomFields = dto.RpCustomFields ?? null,
                     MoodlesData = dto.MoodlesData ?? null,
-                    ProfileIconId = dto.ProfileIconId ?? 0
+                    ChatIcon = dto.ChatIcon ?? 0
                 };
                 await DbContext.CharacterRpProfiles.AddAsync(rpProfileData).ConfigureAwait(false);
             }

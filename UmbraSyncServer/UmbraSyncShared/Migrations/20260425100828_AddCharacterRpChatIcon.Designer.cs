@@ -3,6 +3,7 @@ using System;
 using MareSynchronosShared.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MareSynchronosServer.Migrations
 {
     [DbContext(typeof(MareDbContext))]
-    partial class MareDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260425100828_AddCharacterRpChatIcon")]
+    partial class AddCharacterRpChatIcon
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -386,6 +389,10 @@ namespace MareSynchronosServer.Migrations
                     b.Property<string>("MoodlesData")
                         .HasColumnType("text")
                         .HasColumnName("moodles_data");
+
+                    b.Property<long>("ProfileIconId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("profile_icon_id");
 
                     b.Property<string>("RpAdditionalInfo")
                         .HasColumnType("text")
