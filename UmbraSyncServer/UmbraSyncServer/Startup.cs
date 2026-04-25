@@ -123,7 +123,7 @@ public class Startup
             hubOptions.MaximumParallelInvocationsPerClient = 10;
             hubOptions.StreamBufferCapacity = 200;
             hubOptions.ClientTimeoutInterval = TimeSpan.FromMinutes(30);
-            hubOptions.KeepAliveInterval = TimeSpan.FromSeconds(30);
+            hubOptions.KeepAliveInterval = TimeSpan.FromSeconds(15);
 
             hubOptions.AddFilter<SignalRLimitFilter>();
             hubOptions.AddFilter<ConcurrencyFilter>();
