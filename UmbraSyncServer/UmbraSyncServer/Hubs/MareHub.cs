@@ -41,8 +41,8 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
 
     private readonly Lazy<MareDbContext> _dbContextLazy;
     private MareDbContext DbContext => _dbContextLazy.Value;
-    private CancellationTokenSource _disconnectCts;
     private DateTime _connectedAtUtc;
+    private string _transport = "unknown";
 
     public MareHub(MareMetrics mareMetrics,
         IDbContextFactory<MareDbContext> mareDbContextFactory, ILogger<MareHub> logger, SystemInfoService systemInfoService,
@@ -76,7 +76,6 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
         if (disposing)
         {
             DbContext.Dispose();
-            _disconnectCts?.Dispose();
         }
 
         base.Dispose(disposing);
@@ -140,10 +139,11 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
     [Authorize(Policy = "Authenticated")]
     public override async Task OnConnectedAsync()
     {
-        _mareMetrics.IncGaugeWithLabels(MetricsAPI.GaugeConnections, labels: Continent);
         _connectedAtUtc = DateTime.UtcNow;
+        _transport = GetTransportType();
+        _mareMetrics.IncGaugeWithLabels(MetricsAPI.GaugeConnections, labels: new[] { Continent, _transport });
 
-        _logger.LogCallInfo(MareHubLogger.Args(_contextAccessor.GetIpAddress(), Context.ConnectionId, UserCharaIdent, "Transport", GetTransportType(), "UA", GetUserAgent()));
+        _logger.LogCallInfo(MareHubLogger.Args(_contextAccessor.GetIpAddress(), Context.ConnectionId, UserCharaIdent, "Transport", _transport, "UA", GetUserAgent()));
 
         await SafeLifecycleStep("InitPlayer", () => _pairCacheService.InitPlayer(UserUID)).ConfigureAwait(false);
         await SafeLifecycleStep("UpdateUserOnRedis", () => UpdateUserOnRedis()).ConfigureAwait(false);
@@ -185,9 +185,7 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
     [Authorize(Policy = "Authenticated")]
     public override async Task OnDisconnectedAsync(Exception exception)
     {
-        _mareMetrics.DecGaugeWithLabels(MetricsAPI.GaugeConnections, labels: Continent);
-        _disconnectCts?.Dispose();
-        _disconnectCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        _mareMetrics.DecGaugeWithLabels(MetricsAPI.GaugeConnections, labels: new[] { Continent, _transport });
 
         var sessionDurationSec = _connectedAtUtc == default ? -1 : (int)(DateTime.UtcNow - _connectedAtUtc).TotalSeconds;
         var exceptionType = exception?.GetType().Name ?? "null";
@@ -197,13 +195,10 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
             _contextAccessor.GetIpAddress(),
             Context.ConnectionId,
             UserCharaIdent,
-            "Transport", GetTransportType(),
+            "Transport", _transport,
             "SessionSec", sessionDurationSec,
             "ExceptionType", exceptionType,
             "ExceptionMessage", exceptionMessage));
-
-        if (exception != null)
-            _logger.LogCallWarning(MareHubLogger.Args(_contextAccessor.GetIpAddress(), Context.ConnectionId, "DisconnectException", exception.GetType().Name, exception.Message));
         
         bool shouldCleanup = false;
         await SafeLifecycleStep("RemoveConnectionFromRedis", async () =>
