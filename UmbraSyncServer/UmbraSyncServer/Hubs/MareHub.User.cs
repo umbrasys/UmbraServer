@@ -25,11 +25,9 @@ public partial class MareHub
     {
         _logger.LogCallInfo(MareHubLogger.Args(dto));
 
-        // don't allow adding nothing
         var uid = dto.User.UID.Trim();
         if (string.Equals(dto.User.UID, UserUID, StringComparison.Ordinal) || string.IsNullOrWhiteSpace(dto.User.UID)) return;
 
-        // grab other user, check if it exists and if a pair already exists
         var otherUser = await DbContext.Users.SingleOrDefaultAsync(u => u.UID == uid || u.Alias == uid).ConfigureAwait(false);
         if (otherUser == null)
         {
@@ -50,48 +48,100 @@ public partial class MareHub
 
         if (existingEntry != null)
         {
-            await Clients.Caller.Client_ReceiveServerMessage(MessageSeverity.Warning, $"Cannot pair with {dto.User.UID}, already paired").ConfigureAwait(false);
+            // Idempotence : on resynchronise l'état au caller au lieu de renvoyer un warning bloquant.
+            var oppositeEntry = OppositeEntry(otherUser.UID);
+            var ownPermsResync = await DbContext.Permissions.AsNoTracking()
+                .SingleOrDefaultAsync(p => p.UserUID == UserUID && p.OtherUserUID == otherUser.UID).ConfigureAwait(false);
+            var otherPermsResync = oppositeEntry == null ? null : await DbContext.Permissions.AsNoTracking()
+                .SingleOrDefaultAsync(p => p.UserUID == otherUser.UID && p.OtherUserUID == UserUID).ConfigureAwait(false);
+            var ownPermResync = ownPermsResync.ToUserPermissions(setSticky: true);
+            var otherPermResync = otherPermsResync.ToUserPermissions();
+            var resyncStatus = oppositeEntry != null ? IndividualPairStatus.Bidirectional : IndividualPairStatus.OneSided;
+            await Clients.Caller.Client_UserAddClientPair(new UserPairDto(otherUser.ToUserData(), resyncStatus, ownPermResync, otherPermResync)).ConfigureAwait(false);
+            _logger.LogCallInfo(MareHubLogger.Args(dto, "AlreadyPaired-Resync"));
             return;
         }
 
-        // grab self create new client pair and save
         var user = await DbContext.Users.SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
 
         _logger.LogCallInfo(MareHubLogger.Args(dto, "Success"));
 
         ClientPair wl = new ClientPair()
         {
-            IsPaused = false,
             OtherUser = otherUser,
             User = user,
         };
         await DbContext.ClientPairs.AddAsync(wl).ConfigureAwait(false);
+
+        // Initialise le UserPermissionSet du caller en utilisant ses préférences par défaut, sauf si une entrée existe déjà
+        // avec sticky=true (cas d'une pair re-créée après suppression : on respecte les anciennes préfs).
+        var existingPerms = await DbContext.Permissions
+            .SingleOrDefaultAsync(p => p.UserUID == UserUID && p.OtherUserUID == otherUser.UID).ConfigureAwait(false);
+        UserPermissionSet permissions;
+        if (existingPerms == null || !existingPerms.Sticky)
+        {
+            var ownDefaultPerms = await DbContext.UserDefaultPreferredPermissions.AsNoTracking()
+                .SingleOrDefaultAsync(p => p.UserUID == UserUID).ConfigureAwait(false);
+            if (existingPerms == null)
+            {
+                permissions = new UserPermissionSet
+                {
+                    User = user,
+                    OtherUser = otherUser,
+                    DisableAnimations = ownDefaultPerms?.DisableIndividualAnimations ?? false,
+                    DisableSounds = ownDefaultPerms?.DisableIndividualSounds ?? false,
+                    DisableVFX = ownDefaultPerms?.DisableIndividualVFX ?? false,
+                    IsPaused = false,
+                    Sticky = true,
+                };
+                await DbContext.Permissions.AddAsync(permissions).ConfigureAwait(false);
+            }
+            else
+            {
+                existingPerms.DisableAnimations = ownDefaultPerms?.DisableIndividualAnimations ?? false;
+                existingPerms.DisableSounds = ownDefaultPerms?.DisableIndividualSounds ?? false;
+                existingPerms.DisableVFX = ownDefaultPerms?.DisableIndividualVFX ?? false;
+                existingPerms.IsPaused = false;
+                existingPerms.Sticky = true;
+                DbContext.Permissions.Update(existingPerms);
+                permissions = existingPerms;
+            }
+        }
+        else
+        {
+            permissions = existingPerms;
+        }
+
         await DbContext.SaveChangesAsync().ConfigureAwait(false);
 
-        // get the opposite entry of the client pair
         var otherEntry = OppositeEntry(otherUser.UID);
         var otherIdent = await GetUserIdent(otherUser.UID).ConfigureAwait(false);
 
-        var ownPerm = UserPermissions.Paired;
-        var otherPerm = UserPermissions.NoneSet;
-        otherPerm.SetPaired(otherEntry != null);
-        otherPerm.SetPaused(otherEntry?.IsPaused ?? false);
-        var userPairResponse = new UserPairDto(otherUser.ToUserData(), ownPerm, otherPerm);
+        var otherPermsEntry = otherEntry == null ? null : await DbContext.Permissions.AsNoTracking()
+            .SingleOrDefaultAsync(p => p.UserUID == otherUser.UID && p.OtherUserUID == UserUID).ConfigureAwait(false);
+
+        var ownPerm = permissions.ToUserPermissions(setSticky: true);
+        var otherPerm = otherPermsEntry.ToUserPermissions();
+
+        var status = otherEntry == null ? IndividualPairStatus.OneSided : IndividualPairStatus.Bidirectional;
+        var userPairResponse = new UserPairDto(otherUser.ToUserData(), status, ownPerm, otherPerm);
         await Clients.User(user.UID).Client_UserAddClientPair(userPairResponse).ConfigureAwait(false);
 
-        // notify the other user of the incoming pair request (one-way pairing)
         if (otherEntry == null && otherIdent != null)
         {
             await Clients.User(otherUser.UID).Client_ReceivePairRequest(new UserDto(user.ToUserData())).ConfigureAwait(false);
         }
 
-        // check if other user is online
         if (otherIdent == null || otherEntry == null) return;
 
-        // send push with update to other user if other user is online
-        await Clients.User(otherUser.UID).Client_UserAddClientPair(new UserPairDto(user.ToUserData(), otherPerm, ownPerm)).ConfigureAwait(false);
+        // Pair devient bidirectionnel : on prévient les deux côtés du nouveau statut.
+        await Clients.User(otherUser.UID)
+            .Client_UpdateUserIndividualPairStatusDto(new UserIndividualPairStatusDto(user.ToUserData(), IndividualPairStatus.Bidirectional)).ConfigureAwait(false);
 
-        if (!otherPerm.IsPaused())
+        await Clients.User(otherUser.UID)
+            .Client_UserUpdateOtherPairPermissions(new UserPermissionsDto(user.ToUserData(), permissions.ToUserPermissions())).ConfigureAwait(false);
+
+        if (!ownPerm.IsPaused() && !otherPerm.IsPaused())
         {
             await Clients.User(UserUID).Client_UserSendOnline(new(otherUser.ToUserData(), otherIdent)).ConfigureAwait(false);
             await Clients.User(otherUser.UID).Client_UserSendOnline(new(user.ToUserData(), UserCharaIdent)).ConfigureAwait(false);
@@ -127,56 +177,61 @@ public partial class MareHub
     }
 
     [Authorize(Policy = "Identified")]
-    public async Task<List<UserPairDto>> UserGetPairedClients()
+    public async Task<List<UserFullPairDto>> UserGetPairedClients()
     {
         _logger.LogCallInfo();
 
-        var query =
-            from userToOther in DbContext.ClientPairs
-            join otherToUser in DbContext.ClientPairs
-                on new
-                {
-                    user = userToOther.UserUID,
-                    other = userToOther.OtherUserUID,
-                } equals new
-                {
-                    user = otherToUser.OtherUserUID,
-                    other = otherToUser.UserUID,
-                } into leftJoin
+        // Pairs directs (et leur état miroir éventuel)
+        var directPairsQuery =
+            from userToOther in DbContext.ClientPairs.AsNoTracking()
+            join otherToUser in DbContext.ClientPairs.AsNoTracking()
+                on new { user = userToOther.UserUID, other = userToOther.OtherUserUID }
+                equals new { user = otherToUser.OtherUserUID, other = otherToUser.UserUID }
+                into leftJoin
             from otherEntry in leftJoin.DefaultIfEmpty()
-            where
-                userToOther.UserUID == UserUID
+            where userToOther.UserUID == UserUID
             select new
             {
-                userToOther.OtherUser.Alias,
-                userToOther.IsPaused,
-                OtherIsPaused = otherEntry != null && otherEntry.IsPaused,
                 userToOther.OtherUserUID,
+                userToOther.OtherUser.Alias,
                 IsSynced = otherEntry != null,
-                DisableOwnAnimations = userToOther.DisableAnimations,
-                DisableOwnSounds = userToOther.DisableSounds,
-                DisableOwnVFX = userToOther.DisableVFX,
-                DisableOtherAnimations = otherEntry == null ? false : otherEntry.DisableAnimations,
-                DisableOtherSounds = otherEntry == null ? false : otherEntry.DisableSounds,
-                DisableOtherVFX = otherEntry == null ? false : otherEntry.DisableVFX
             };
 
-        var results = await query.AsNoTracking().ToListAsync().ConfigureAwait(false);
+        var directPairs = await directPairsQuery.ToListAsync().ConfigureAwait(false);
 
-        return results.Select(c =>
+        // Permissions du caller pour chaque pair direct
+        var directOtherUids = directPairs.Select(p => p.OtherUserUID).ToList();
+        var ownPermissions = await DbContext.Permissions.AsNoTracking()
+            .Where(p => p.UserUID == UserUID && directOtherUids.Contains(p.OtherUserUID))
+            .ToDictionaryAsync(p => p.OtherUserUID, p => p, StringComparer.Ordinal).ConfigureAwait(false);
+
+        // Permissions miroir (l'autre user nous a appairé)
+        var otherPermissions = await DbContext.Permissions.AsNoTracking()
+            .Where(p => p.OtherUserUID == UserUID && directOtherUids.Contains(p.UserUID))
+            .ToDictionaryAsync(p => p.UserUID, p => p, StringComparer.Ordinal).ConfigureAwait(false);
+
+        // GIDs partagés via syncshell (utile pour l'UI)
+        var sharedGroupQuery =
+            from gp1 in DbContext.GroupPairs.AsNoTracking()
+            join gp2 in DbContext.GroupPairs.AsNoTracking() on gp1.GroupGID equals gp2.GroupGID
+            where gp1.GroupUserUID == UserUID && gp2.GroupUserUID != UserUID
+            select new { gp2.GroupUserUID, gp1.GroupGID };
+        var sharedGroups = await sharedGroupQuery.ToListAsync().ConfigureAwait(false);
+        var groupsByOther = sharedGroups.GroupBy(s => s.GroupUserUID, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.GroupGID).Distinct(StringComparer.Ordinal).ToList(), StringComparer.Ordinal);
+
+        return directPairs.Select(p =>
         {
-            var ownPerm = UserPermissions.Paired;
-            ownPerm.SetPaused(c.IsPaused);
-            ownPerm.SetDisableAnimations(c.DisableOwnAnimations);
-            ownPerm.SetDisableSounds(c.DisableOwnSounds);
-            ownPerm.SetDisableVFX(c.DisableOwnVFX);
-            var otherPerm = UserPermissions.NoneSet;
-            otherPerm.SetPaired(c.IsSynced);
-            otherPerm.SetPaused(c.OtherIsPaused);
-            otherPerm.SetDisableAnimations(c.DisableOtherAnimations);
-            otherPerm.SetDisableSounds(c.DisableOtherSounds);
-            otherPerm.SetDisableVFX(c.DisableOtherVFX);
-            return new UserPairDto(new(c.OtherUserUID, c.Alias), ownPerm, otherPerm);
+            ownPermissions.TryGetValue(p.OtherUserUID, out var ownPerms);
+            otherPermissions.TryGetValue(p.OtherUserUID, out var otherPerms);
+            var ownPerm = ownPerms.ToUserPermissions(setSticky: true);
+            var otherPerm = otherPerms.ToUserPermissions();
+            // Quand on est un OneSided sortant, otherPerm.Paired vaut false même si on a une UserPermissionSet miroir.
+            // ToUserPermissions() met systématiquement Paired=true si perms != null. Il faut donc reset si pas synced.
+            if (!p.IsSynced) otherPerm.SetPaired(false);
+            var status = p.IsSynced ? IndividualPairStatus.Bidirectional : IndividualPairStatus.OneSided;
+            groupsByOther.TryGetValue(p.OtherUserUID, out var gids);
+            return new UserFullPairDto(new UserData(p.OtherUserUID, p.Alias), status, gids ?? [], ownPerm, otherPerm);
         }).ToList();
     }
 
@@ -445,14 +500,15 @@ public partial class MareHub
 
         if (string.Equals(dto.User.UID, UserUID, StringComparison.Ordinal)) return;
 
-        // check if client pair even exists
         ClientPair callerPair =
             await DbContext.ClientPairs.SingleOrDefaultAsync(w => w.UserUID == UserUID && w.OtherUserUID == dto.User.UID).ConfigureAwait(false);
         if (callerPair == null) return;
 
-        bool callerHadPaused = callerPair.IsPaused;
+        // Permissions caller pour cette pair (avant suppression)
+        var ownPerms = await DbContext.Permissions.AsNoTracking()
+            .SingleOrDefaultAsync(p => p.UserUID == UserUID && p.OtherUserUID == dto.User.UID).ConfigureAwait(false);
+        bool callerHadPaused = ownPerms?.IsPaused ?? false;
 
-        // delete from database, send update info to users pair list
         DbContext.ClientPairs.Remove(callerPair);
         await DbContext.SaveChangesAsync().ConfigureAwait(false);
 
@@ -460,38 +516,37 @@ public partial class MareHub
 
         await Clients.User(UserUID).Client_UserRemoveClientPair(dto).ConfigureAwait(false);
 
-        // check if opposite entry exists
         var oppositeClientPair = OppositeEntry(dto.User.UID);
         if (oppositeClientPair == null) return;
 
-        // check if other user is online, if no then there is no need to do anything further
+        // Notifie l'autre user de la transition Bidirectional → OneSided
+        await Clients.User(dto.User.UID)
+            .Client_UpdateUserIndividualPairStatusDto(new UserIndividualPairStatusDto(new UserData(UserUID), IndividualPairStatus.OneSided))
+            .ConfigureAwait(false);
+
         var otherIdent = await GetUserIdent(dto.User.UID).ConfigureAwait(false);
         if (otherIdent == null) return;
 
-        // get own ident and
         await Clients.User(dto.User.UID)
-            .Client_UserUpdateOtherPairPermissions(new UserPermissionsDto(new UserData(UserUID),
-                UserPermissions.NoneSet)).ConfigureAwait(false);
+            .Client_UserUpdateOtherPairPermissions(new UserPermissionsDto(new UserData(UserUID), UserPermissions.NoneSet)).ConfigureAwait(false);
 
-        // if the other user had paused the user the state will be offline for either, do nothing
-        bool otherHadPaused = oppositeClientPair.IsPaused;
+        var otherPerms = await DbContext.Permissions.AsNoTracking()
+            .SingleOrDefaultAsync(p => p.UserUID == dto.User.UID && p.OtherUserUID == UserUID).ConfigureAwait(false);
+        bool otherHadPaused = otherPerms?.IsPaused ?? false;
         if (!callerHadPaused && otherHadPaused) return;
 
         var allUsers = await GetAllPairedClientsWithPauseState().ConfigureAwait(false);
         var pauseEntry = allUsers.SingleOrDefault(f => string.Equals(f.UID, dto.User.UID, StringComparison.Ordinal));
         var isPausedInGroup = pauseEntry == null || pauseEntry.IsPausedPerGroup is PauseInfo.Paused or PauseInfo.NoConnection;
 
-        // if neither user had paused each other and both are in unpaused groups, state will be online for both, do nothing
         if (!callerHadPaused && !otherHadPaused && !isPausedInGroup) return;
 
-        // if neither user had paused each other and either is not in an unpaused group with each other, change state to offline
         if (!callerHadPaused && !otherHadPaused && isPausedInGroup)
         {
             await Clients.User(UserUID).Client_UserSendOffline(dto).ConfigureAwait(false);
             await Clients.User(dto.User.UID).Client_UserSendOffline(new(new(UserUID))).ConfigureAwait(false);
         }
 
-        // if the caller had paused other but not the other has paused the caller and they are in an unpaused group together, change state to online
         if (callerHadPaused && !otherHadPaused && !isPausedInGroup)
         {
             await Clients.User(UserUID).Client_UserSendOnline(new(dto.User, otherIdent)).ConfigureAwait(false);
@@ -548,30 +603,52 @@ public partial class MareHub
         ClientPair pair = await DbContext.ClientPairs.SingleOrDefaultAsync(w => w.UserUID == UserUID && w.OtherUserUID == dto.User.UID).ConfigureAwait(false);
         if (pair == null) return;
 
-        var pauseChange = pair.IsPaused != dto.Permissions.IsPaused();
+        var permsRow = await DbContext.Permissions.SingleOrDefaultAsync(p => p.UserUID == UserUID && p.OtherUserUID == dto.User.UID).ConfigureAwait(false);
+        if (permsRow == null)
+        {
+            permsRow = new UserPermissionSet
+            {
+                UserUID = UserUID,
+                OtherUserUID = dto.User.UID,
+                Sticky = true,
+            };
+            await DbContext.Permissions.AddAsync(permsRow).ConfigureAwait(false);
+        }
 
-        pair.IsPaused = dto.Permissions.IsPaused();
-        pair.DisableAnimations = dto.Permissions.IsDisableAnimations();
-        pair.DisableSounds = dto.Permissions.IsDisableSounds();
-        pair.DisableVFX = dto.Permissions.IsDisableVFX();
-        DbContext.Update(pair);
+        var pauseChange = permsRow.IsPaused != dto.Permissions.IsPaused();
+
+        permsRow.IsPaused = dto.Permissions.IsPaused();
+        permsRow.DisableAnimations = dto.Permissions.IsDisableAnimations();
+        permsRow.DisableSounds = dto.Permissions.IsDisableSounds();
+        permsRow.DisableVFX = dto.Permissions.IsDisableVFX();
+        permsRow.Sticky = dto.Permissions.IsSticky() || permsRow.Sticky;
+        DbContext.Update(permsRow);
         await DbContext.SaveChangesAsync().ConfigureAwait(false);
 
         _logger.LogCallInfo(MareHubLogger.Args(dto, "Success"));
 
         var otherEntry = OppositeEntry(dto.User.UID);
 
-        await Clients.User(UserUID).Client_UserUpdateSelfPairPermissions(dto).ConfigureAwait(false);
+        // On renvoie au caller un dto enrichi du sticky état
+        var ownPerm = dto.Permissions;
+        ownPerm.SetSticky(permsRow.Sticky);
+        await Clients.User(UserUID).Client_UserUpdateSelfPairPermissions(new UserPermissionsDto(dto.User, ownPerm)).ConfigureAwait(false);
 
         if (otherEntry != null)
         {
-            await Clients.User(dto.User.UID).Client_UserUpdateOtherPairPermissions(new UserPermissionsDto(new UserData(UserUID), dto.Permissions)).ConfigureAwait(false);
+            // L'autre user reçoit l'update sans la flag Sticky (c'est privé)
+            var otherDtoPerm = dto.Permissions;
+            otherDtoPerm.SetSticky(false);
+            await Clients.User(dto.User.UID).Client_UserUpdateOtherPairPermissions(new UserPermissionsDto(new UserData(UserUID), otherDtoPerm)).ConfigureAwait(false);
+
+            var otherEntryPerms = await DbContext.Permissions.AsNoTracking()
+                .SingleOrDefaultAsync(p => p.UserUID == dto.User.UID && p.OtherUserUID == UserUID).ConfigureAwait(false);
 
             if (pauseChange && _broadcastPresenceOnPermissionChange)
             {
                 var otherCharaIdent = await GetUserIdent(pair.OtherUserUID).ConfigureAwait(false);
 
-                if (UserCharaIdent == null || otherCharaIdent == null || otherEntry.IsPaused) return;
+                if (UserCharaIdent == null || otherCharaIdent == null || (otherEntryPerms?.IsPaused ?? false)) return;
 
                 if (dto.Permissions.IsPaused())
                 {

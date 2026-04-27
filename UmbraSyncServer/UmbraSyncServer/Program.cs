@@ -36,7 +36,7 @@ public class Program
 
             metrics.SetGaugeTo(MetricsAPI.GaugeUsersRegistered, context.Users.AsNoTracking().Count());
             metrics.SetGaugeTo(MetricsAPI.GaugePairs, context.ClientPairs.AsNoTracking().Count());
-            metrics.SetGaugeTo(MetricsAPI.GaugePairsPaused, context.ClientPairs.AsNoTracking().Count(p => p.IsPaused));
+            metrics.SetGaugeTo(MetricsAPI.GaugePairsPaused, context.Permissions.AsNoTracking().Count(p => p.IsPaused));
 
         }
 

@@ -114,22 +114,42 @@ namespace MareSynchronosServer.Utils
         public static GroupPermissions GetGroupPermissions(this Group group)
         {
             var permissions = GroupPermissions.NoneSet;
-            permissions.SetDisableAnimations(group.DisableAnimations);
-            permissions.SetDisableSounds(group.DisableSounds);
+            permissions.SetDisableAnimations(group.PreferDisableAnimations);
+            permissions.SetDisableSounds(group.PreferDisableSounds);
             permissions.SetDisableInvites(!group.InvitesEnabled);
-            permissions.SetDisableVFX(group.DisableVFX);
+            permissions.SetDisableVFX(group.PreferDisableVFX);
             permissions.SetPaused(group.IsPaused);
             return permissions;
         }
 
-        public static GroupUserPermissions GetGroupPairPermissions(this GroupPair groupPair)
+        public static GroupUserPermissions GetGroupPairPermissions(this GroupPair groupPair, GroupPairPreferredPermission? perms)
         {
             var permissions = GroupUserPermissions.NoneSet;
-            permissions.SetDisableAnimations(groupPair.DisableAnimations);
-            permissions.SetDisableSounds(groupPair.DisableSounds);
-            permissions.SetPaused(groupPair.IsPaused);
-            permissions.SetDisableVFX(groupPair.DisableVFX);
+            if (perms != null)
+            {
+                permissions.SetDisableAnimations(perms.DisableAnimations);
+                permissions.SetDisableSounds(perms.DisableSounds);
+                permissions.SetPaused(perms.IsPaused);
+                permissions.SetDisableVFX(perms.DisableVFX);
+            }
             return permissions;
+        }
+
+        // Compat overload : retourne NoneSet quand on n'a pas chargé les preferred permissions.
+        // Tous les appelants devraient idéalement pré-charger GroupPairPreferredPermission et utiliser l'overload ci-dessus.
+        public static GroupUserPermissions GetGroupPairPermissions(this GroupPair groupPair) => GroupUserPermissions.NoneSet;
+
+        public static UserPermissions ToUserPermissions(this UserPermissionSet? perms, bool setSticky = false)
+        {
+            var p = UserPermissions.NoneSet;
+            if (perms == null) return p;
+            p.SetPaired(true);
+            p.SetPaused(perms.IsPaused);
+            p.SetDisableAnimations(perms.DisableAnimations);
+            p.SetDisableSounds(perms.DisableSounds);
+            p.SetDisableVFX(perms.DisableVFX);
+            if (setSticky) p.SetSticky(perms.Sticky);
+            return p;
         }
 
         public static GroupUserInfo GetGroupPairUserInfo(this GroupPair groupPair)

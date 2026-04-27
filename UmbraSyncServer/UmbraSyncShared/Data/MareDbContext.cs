@@ -64,6 +64,9 @@ public class MareDbContext : DbContext
     public DbSet<Establishment> Establishments { get; set; }
     public DbSet<EstablishmentEvent> EstablishmentEvents { get; set; }
     public DbSet<WildRpAnnouncement> WildRpAnnouncements { get; set; }
+    public DbSet<UserPermissionSet> Permissions { get; set; }
+    public DbSet<UserDefaultPreferredPermission> UserDefaultPreferredPermissions { get; set; }
+    public DbSet<GroupPairPreferredPermission> GroupPairPreferredPermissions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -76,6 +79,28 @@ public class MareDbContext : DbContext
         ConfigureHousingShareEntities(mb);
         ConfigureEstablishmentEntities(mb);
         ConfigureWildRpEntities(mb);
+        ConfigurePermissionEntities(mb);
+    }
+
+    private static void ConfigurePermissionEntities(ModelBuilder mb)
+    {
+        mb.Entity<UserPermissionSet>().ToTable("user_permission_sets");
+        mb.Entity<UserPermissionSet>().HasKey(u => new { u.UserUID, u.OtherUserUID });
+        mb.Entity<UserPermissionSet>().HasIndex(u => u.UserUID);
+        mb.Entity<UserPermissionSet>().HasIndex(u => u.OtherUserUID);
+        mb.Entity<UserPermissionSet>().HasOne(u => u.User).WithMany().HasForeignKey(u => u.UserUID).OnDelete(DeleteBehavior.Cascade);
+        mb.Entity<UserPermissionSet>().HasOne(u => u.OtherUser).WithMany().HasForeignKey(u => u.OtherUserUID).OnDelete(DeleteBehavior.Cascade);
+
+        mb.Entity<UserDefaultPreferredPermission>().ToTable("user_default_preferred_permissions");
+        mb.Entity<UserDefaultPreferredPermission>().HasKey(u => u.UserUID);
+        mb.Entity<UserDefaultPreferredPermission>().HasOne(u => u.User).WithOne().HasForeignKey<UserDefaultPreferredPermission>(u => u.UserUID).OnDelete(DeleteBehavior.Cascade);
+
+        mb.Entity<GroupPairPreferredPermission>().ToTable("group_pair_preferred_permissions");
+        mb.Entity<GroupPairPreferredPermission>().HasKey(g => new { g.UserUID, g.GroupGID });
+        mb.Entity<GroupPairPreferredPermission>().HasIndex(g => g.GroupGID);
+        mb.Entity<GroupPairPreferredPermission>().HasIndex(g => g.UserUID);
+        mb.Entity<GroupPairPreferredPermission>().HasOne(g => g.Group).WithMany().HasForeignKey(g => g.GroupGID).OnDelete(DeleteBehavior.Cascade);
+        mb.Entity<GroupPairPreferredPermission>().HasOne(g => g.User).WithMany().HasForeignKey(g => g.UserUID).OnDelete(DeleteBehavior.Cascade);
     }
 
     private static void ConfigureSlotEntities(ModelBuilder mb)

@@ -56,9 +56,9 @@ public partial class MareHub
         if (!hasRights) return;
 
         group.InvitesEnabled = !dto.Permissions.HasFlag(GroupPermissions.DisableInvites);
-        group.DisableSounds = dto.Permissions.HasFlag(GroupPermissions.DisableSounds);
-        group.DisableAnimations = dto.Permissions.HasFlag(GroupPermissions.DisableAnimations);
-        group.DisableVFX = dto.Permissions.HasFlag(GroupPermissions.DisableVFX);
+        group.PreferDisableSounds = dto.Permissions.HasFlag(GroupPermissions.DisableSounds);
+        group.PreferDisableAnimations = dto.Permissions.HasFlag(GroupPermissions.DisableAnimations);
+        group.PreferDisableVFX = dto.Permissions.HasFlag(GroupPermissions.DisableVFX);
         group.IsPaused = dto.Permissions.HasFlag(GroupPermissions.Paused);
 
         await DbContext.SaveChangesAsync().ConfigureAwait(false);
@@ -75,11 +75,19 @@ public partial class MareHub
         var (inGroup, groupPair) = await TryValidateUserInGroup(dto.Group.GID).ConfigureAwait(false);
         if (!inGroup) return;
 
-        var wasPaused = groupPair.IsPaused;
-        groupPair.DisableSounds = dto.GroupPairPermissions.IsDisableSounds();
-        groupPair.DisableAnimations = dto.GroupPairPermissions.IsDisableAnimations();
-        groupPair.IsPaused = dto.GroupPairPermissions.IsPaused();
-        groupPair.DisableVFX = dto.GroupPairPermissions.IsDisableVFX();
+        var groupPrefs = await DbContext.GroupPairPreferredPermissions
+            .SingleOrDefaultAsync(p => p.GroupGID == dto.Group.GID && p.UserUID == UserUID).ConfigureAwait(false);
+        if (groupPrefs == null)
+        {
+            groupPrefs = new GroupPairPreferredPermission { GroupGID = dto.Group.GID, UserUID = UserUID };
+            await DbContext.GroupPairPreferredPermissions.AddAsync(groupPrefs).ConfigureAwait(false);
+        }
+
+        var wasPaused = groupPrefs.IsPaused;
+        groupPrefs.DisableSounds = dto.GroupPairPermissions.IsDisableSounds();
+        groupPrefs.DisableAnimations = dto.GroupPairPermissions.IsDisableAnimations();
+        groupPrefs.IsPaused = dto.GroupPairPermissions.IsPaused();
+        groupPrefs.DisableVFX = dto.GroupPairPermissions.IsDisableVFX();
 
         await DbContext.SaveChangesAsync().ConfigureAwait(false);
 
@@ -89,7 +97,7 @@ public partial class MareHub
         var allUserPairs = await GetAllPairedClientsWithPauseState().ConfigureAwait(false);
         var self = await DbContext.Users.SingleAsync(u => u.UID == UserUID).ConfigureAwait(false);
 
-        if (wasPaused == groupPair.IsPaused) return;
+        if (wasPaused == groupPrefs.IsPaused) return;
 
         foreach (var groupUserPair in groupPairs.Where(u => !string.Equals(u.GroupUserUID, UserUID, StringComparison.Ordinal)).ToList())
         {
@@ -104,7 +112,7 @@ public partial class MareHub
             var groupUserIdent = await GetUserIdent(groupUserPair.GroupUserUID).ConfigureAwait(false);
             if (!string.IsNullOrEmpty(groupUserIdent))
             {
-                if (!groupPair.IsPaused)
+                if (!groupPrefs.IsPaused)
                 {
                     await Clients.User(UserUID).Client_UserSendOnline(new(groupUserPair.ToUserData(), groupUserIdent)).ConfigureAwait(false);
                     await Clients.User(groupUserPair.GroupUserUID)
@@ -325,7 +333,6 @@ public partial class MareHub
         {
             GroupGID = newGroup.GID,
             GroupUserUID = UserUID,
-            IsPaused = false,
             IsPinned = true,
         };
 
@@ -408,7 +415,6 @@ public partial class MareHub
         {
             GroupGID = newGroup.GID,
             GroupUserUID = UserUID,
-            IsPaused = false,
             IsPinned = true,
         };
 
@@ -889,9 +895,6 @@ public partial class MareHub
         {
             GroupGID = group.GID,
             GroupUserUID = UserUID,
-            DisableAnimations = false,
-            DisableSounds = false,
-            DisableVFX = false
         };
 
         await DbContext.GroupPairs.AddAsync(newPair).ConfigureAwait(false);

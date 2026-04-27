@@ -145,31 +145,48 @@ public partial class MareHub
     {
         uid ??= UserUID;
 
-        var query = await (from userPair in DbContext.ClientPairs
-                           join otherUserPair in DbContext.ClientPairs on userPair.OtherUserUID equals otherUserPair.UserUID
-                           where otherUserPair.OtherUserUID == uid && userPair.UserUID == uid
-                           select new
-                           {
-                               UID = Convert.ToString(userPair.OtherUserUID),
-                               GID = "DIRECT",
-                               PauseStateSelf = userPair.IsPaused,
-                               PauseStateOther = otherUserPair.IsPaused,
-                           })
-                            .Union(
-                                (from userGroupPair in DbContext.GroupPairs
-                                 join otherGroupPair in DbContext.GroupPairs on userGroupPair.GroupGID equals otherGroupPair.GroupGID
-                                 join g in DbContext.Groups on userGroupPair.GroupGID equals g.GID
-                                 where
-                                     userGroupPair.GroupUserUID == uid
-                                     && otherGroupPair.GroupUserUID != uid
+        // Pairs directes : LEFT JOIN sur user_permission_sets pour récupérer l'état de pause de chaque côté
+        var directQuery = await (from userPair in DbContext.ClientPairs.AsNoTracking()
+                                 join otherUserPair in DbContext.ClientPairs.AsNoTracking() on userPair.OtherUserUID equals otherUserPair.UserUID
+                                 join ownPerm in DbContext.Permissions.AsNoTracking()
+                                     on new { U = userPair.UserUID, O = userPair.OtherUserUID }
+                                     equals new { U = ownPerm.UserUID, O = ownPerm.OtherUserUID } into ownLeft
+                                 from ownPerm in ownLeft.DefaultIfEmpty()
+                                 join otherPerm in DbContext.Permissions.AsNoTracking()
+                                     on new { U = otherUserPair.UserUID, O = otherUserPair.OtherUserUID }
+                                     equals new { U = otherPerm.UserUID, O = otherPerm.OtherUserUID } into otherLeft
+                                 from otherPerm in otherLeft.DefaultIfEmpty()
+                                 where otherUserPair.OtherUserUID == uid && userPair.UserUID == uid
                                  select new
                                  {
-                                     UID = Convert.ToString(otherGroupPair.GroupUserUID),
-                                     GID = Convert.ToString(otherGroupPair.GroupGID),
-                                     PauseStateSelf = userGroupPair.IsPaused || g.IsPaused,
-                                     PauseStateOther = otherGroupPair.IsPaused || g.IsPaused,
-                                 })
-                            ).AsNoTracking().ToListAsync().ConfigureAwait(false);
+                                     UID = Convert.ToString(userPair.OtherUserUID),
+                                     GID = "DIRECT",
+                                     PauseStateSelf = ownPerm != null && ownPerm.IsPaused,
+                                     PauseStateOther = otherPerm != null && otherPerm.IsPaused,
+                                 }).ToListAsync().ConfigureAwait(false);
+
+        // Pairs via syncshell : LEFT JOIN sur group_pair_preferred_permissions pour chaque côté + état pause group
+        var groupQuery = await (from userGroupPair in DbContext.GroupPairs.AsNoTracking()
+                                join otherGroupPair in DbContext.GroupPairs.AsNoTracking() on userGroupPair.GroupGID equals otherGroupPair.GroupGID
+                                join g in DbContext.Groups.AsNoTracking() on userGroupPair.GroupGID equals g.GID
+                                join ownGroupPrefs in DbContext.GroupPairPreferredPermissions.AsNoTracking()
+                                    on new { U = userGroupPair.GroupUserUID, G = userGroupPair.GroupGID }
+                                    equals new { U = ownGroupPrefs.UserUID, G = ownGroupPrefs.GroupGID } into ownGroupLeft
+                                from ownGroupPrefs in ownGroupLeft.DefaultIfEmpty()
+                                join otherGroupPrefs in DbContext.GroupPairPreferredPermissions.AsNoTracking()
+                                    on new { U = otherGroupPair.GroupUserUID, G = otherGroupPair.GroupGID }
+                                    equals new { U = otherGroupPrefs.UserUID, G = otherGroupPrefs.GroupGID } into otherGroupLeft
+                                from otherGroupPrefs in otherGroupLeft.DefaultIfEmpty()
+                                where userGroupPair.GroupUserUID == uid && otherGroupPair.GroupUserUID != uid
+                                select new
+                                {
+                                    UID = Convert.ToString(otherGroupPair.GroupUserUID),
+                                    GID = Convert.ToString(otherGroupPair.GroupGID),
+                                    PauseStateSelf = (ownGroupPrefs != null && ownGroupPrefs.IsPaused) || g.IsPaused,
+                                    PauseStateOther = (otherGroupPrefs != null && otherGroupPrefs.IsPaused) || g.IsPaused,
+                                }).ToListAsync().ConfigureAwait(false);
+
+        var query = directQuery.Concat(groupQuery).ToList();
 
         return query.GroupBy(g => g.UID, g => (g.GID, g.PauseStateSelf, g.PauseStateOther),
             (key, g) => new PausedEntry
@@ -191,10 +208,20 @@ public partial class MareHub
     {
         uid ??= UserUID;
 
-        var query = await (from userPair in DbContext.ClientPairs
-                           join otherUserPair in DbContext.ClientPairs on userPair.OtherUserUID equals otherUserPair.UserUID
-                           where otherUserPair.OtherUserUID == uid && userPair.UserUID == uid && !userPair.IsPaused && !otherUserPair.IsPaused
-                           select Convert.ToString(userPair.OtherUserUID)).AsNoTracking().ToListAsync().ConfigureAwait(false);
+        var query = await (from userPair in DbContext.ClientPairs.AsNoTracking()
+                           join otherUserPair in DbContext.ClientPairs.AsNoTracking() on userPair.OtherUserUID equals otherUserPair.UserUID
+                           join ownPerm in DbContext.Permissions.AsNoTracking()
+                               on new { U = userPair.UserUID, O = userPair.OtherUserUID }
+                               equals new { U = ownPerm.UserUID, O = ownPerm.OtherUserUID } into ownLeft
+                           from ownPerm in ownLeft.DefaultIfEmpty()
+                           join otherPerm in DbContext.Permissions.AsNoTracking()
+                               on new { U = otherUserPair.UserUID, O = otherUserPair.OtherUserUID }
+                               equals new { U = otherPerm.UserUID, O = otherPerm.OtherUserUID } into otherLeft
+                           from otherPerm in otherLeft.DefaultIfEmpty()
+                           where otherUserPair.OtherUserUID == uid && userPair.UserUID == uid
+                                 && !(ownPerm != null && ownPerm.IsPaused)
+                                 && !(otherPerm != null && otherPerm.IsPaused)
+                           select Convert.ToString(userPair.OtherUserUID)).ToListAsync().ConfigureAwait(false);
 
         return query;
     }
