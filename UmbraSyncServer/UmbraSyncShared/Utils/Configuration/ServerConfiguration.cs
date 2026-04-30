@@ -43,6 +43,9 @@ public class ServerConfiguration : MareConfigurationBase
     public Uri ConnectBaseUrl { get; set; }
     [SensitiveConfiguration]
     public string ConnectServiceToken { get; set; } = string.Empty;
+    
+    [SensitiveConfiguration]
+    public string ConnectIncomingServiceToken { get; set; } = string.Empty;
 
     public override string ToString()
     {
@@ -63,6 +66,7 @@ public class ServerConfiguration : MareConfigurationBase
         sb.AppendLine($"{nameof(HubExecutionConcurrencyLimit)} => {HubExecutionConcurrencyLimit}");
         sb.AppendLine($"{nameof(ConnectBaseUrl)} => {ConnectBaseUrl}");
         sb.AppendLine($"{nameof(ConnectServiceToken)} => ***");
+        sb.AppendLine($"{nameof(ConnectIncomingServiceToken)} => ***");
         return sb.ToString();
     }
 }

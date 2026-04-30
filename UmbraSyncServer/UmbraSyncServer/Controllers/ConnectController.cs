@@ -1,7 +1,10 @@
 using MareSynchronosServer.Services;
+using MareSynchronosShared.Data;
+using MareSynchronosShared.Models;
 using MareSynchronosShared.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace MareSynchronosServer.Controllers;
 
@@ -11,17 +14,57 @@ namespace MareSynchronosServer.Controllers;
 public sealed class ConnectController : ControllerBase
 {
     private readonly ConnectClient _connect;
+    private readonly MareDbContext _db;
     private readonly ILogger<ConnectController> _logger;
 
-    public ConnectController(ConnectClient connect, ILogger<ConnectController> logger)
+    public ConnectController(ConnectClient connect, MareDbContext db, ILogger<ConnectController> logger)
     {
         _connect = connect;
+        _db = db;
         _logger = logger;
     }
 
+    [HttpGet("link-status/{code}")]
+    [Authorize(Policy = "Authenticated")]
+    public async Task<IActionResult> LinkStatus(string code, CancellationToken ct)
+    {
+        if (!_connect.IsConfigured)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = "connect_not_configured" });
+
+        var status = await _connect.GetLinkCodeStatusAsync(code, ct);
+        if (status is null)
+            return StatusCode(StatusCodes.Status502BadGateway, new { error = "connect_unreachable" });
+
+        return Ok(status);
+    }
+    
+    // Utilisé par le plugin pour afficher "Compte lié à X" dans Settings au lieu du bouton "Générer".
+    [HttpGet("my-status")]
+    [Authorize(Policy = "Authenticated")]
+    public async Task<IActionResult> MyStatus(CancellationToken ct)
+    {
+        if (!_connect.IsConfigured)
+            return Ok(new { connectEnabled = false });
+
+        var uid = User.Claims.SingleOrDefault(c => string.Equals(c.Type, MareClaimTypes.Uid, StringComparison.Ordinal))?.Value;
+        if (string.IsNullOrEmpty(uid)) return Unauthorized();
+
+        var verif = await _connect.GetVerificationAsync(uid, ct);
+        if (verif is null)
+            return Ok(new { connectEnabled = true, linked = false });
+
+        return Ok(new { connectEnabled = true, linked = verif.Verified, level = verif.Level, since = verif.Since });
+    }
+
+    public sealed record GenerateLinkCodeRequest(List<CharacterDto>? Characters);
+    public sealed record CharacterDto(string Name, string World);
+
+    private const int MaxCharacters = 50;
+    private const int MaxFieldLength = 64;
+
     [HttpPost("generate-link-code")]
-    [Authorize(Policy = "Identified")]
-    public async Task<IActionResult> GenerateLinkCode(CancellationToken ct)
+    [Authorize(Policy = "Authenticated")]
+    public async Task<IActionResult> GenerateLinkCode([FromBody] GenerateLinkCodeRequest? body, CancellationToken ct)
     {
         if (!_connect.IsConfigured)
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = "connect_not_configured" });
@@ -32,9 +75,20 @@ public sealed class ConnectController : ControllerBase
 
         var alias = User.Claims.SingleOrDefault(c => string.Equals(c.Type, MareClaimTypes.Alias, StringComparison.Ordinal))?.Value;
 
+        // GARDE-FOU SÉCURITÉ : on accepte uniquement Name + World, on rejette tout reste
+        var characters = body?.Characters?
+            .Where(c => !string.IsNullOrWhiteSpace(c.Name))
+            .Take(MaxCharacters)
+            .Select(c => new ConnectClient.CharacterInfo(
+                Truncate(c.Name, MaxFieldLength),
+                Truncate(c.World ?? string.Empty, MaxFieldLength)))
+            .ToList();
+
+        static string Truncate(string s, int max) => s.Length <= max ? s : s[..max];
+
         try
         {
-            var result = await _connect.GenerateLinkCodeAsync(uid, alias, ct);
+            var result = await _connect.GenerateLinkCodeAsync(uid, alias, characters, ct);
             return Ok(new { code = result.Code, expiresAt = result.ExpiresAt });
         }
         catch (HttpRequestException ex)
@@ -47,5 +101,182 @@ public sealed class ConnectController : ControllerBase
             _logger.LogError(ex, "Erreur inattendue lors de la génération du code Connect");
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "internal_error" });
         }
+    }
+    
+    public sealed record RpAvatarDto(string CharacterName, uint WorldId, string? AvatarBase64);
+
+    [HttpGet("rp-avatars/{uid}")]
+    [Authorize(Policy = "ConnectIncoming")]
+    public async Task<IActionResult> GetRpAvatars(string uid, CancellationToken ct)
+    {
+        var avatars = await _db.CharacterRpProfiles
+            .AsNoTracking()
+            .Where(p => p.UserUID == uid && p.RpProfilePictureBase64 != null)
+            .Select(p => new RpAvatarDto(p.CharacterName, p.WorldId, p.RpProfilePictureBase64))
+            .ToListAsync(ct);
+        return Ok(avatars);
+    }
+
+    public sealed record RpProfileDto(
+        string CharacterName,
+        uint WorldId,
+        string? RpFirstName,
+        string? RpLastName,
+        string? RpTitle,
+        string? RpAge,
+        string? RpRace,
+        string? RpEthnicity,
+        string? RpHeight,
+        string? RpBuild,
+        string? RpResidence,
+        string? RpOccupation,
+        string? RpAffiliation,
+        string? RpAlignment,
+        string? RpAdditionalInfo,
+        string? RpCustomFields,
+        string? RpNameColor,
+        bool IsRpNSFW,
+        byte RpLevel);
+
+    [HttpGet("rp-profile/{uid}/{worldId:int}/{characterName}")]
+    [Authorize(Policy = "ConnectIncoming")]
+    public async Task<IActionResult> GetRpProfile(string uid, uint worldId, string characterName, CancellationToken ct)
+    {
+        var profile = await _db.CharacterRpProfiles
+            .AsNoTracking()
+            .SingleOrDefaultAsync(p => p.UserUID == uid && p.CharacterName == characterName && p.WorldId == worldId, ct);
+
+        if (profile is null)
+            return Ok(new RpProfileDto(characterName, worldId, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, false, 0));
+
+        return Ok(new RpProfileDto(
+            profile.CharacterName, profile.WorldId,
+            profile.RpFirstName, profile.RpLastName, profile.RpTitle,
+            profile.RpAge, profile.RpRace, profile.RpEthnicity,
+            profile.RpHeight, profile.RpBuild, profile.RpResidence,
+            profile.RpOccupation, profile.RpAffiliation, profile.RpAlignment,
+            profile.RpAdditionalInfo, profile.RpCustomFields, profile.RpNameColor,
+            profile.IsRpNSFW, profile.RpLevel));
+    }
+
+    [HttpPut("rp-profile/{uid}/{worldId:int}/{characterName}")]
+    [Authorize(Policy = "ConnectIncoming")]
+    public async Task<IActionResult> PutRpProfile(string uid, uint worldId, string characterName,
+        [FromBody] RpProfileDto body, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(uid) || string.IsNullOrWhiteSpace(characterName) || worldId == 0)
+            return BadRequest(new { error = "invalid_key" });
+        
+        var profile = await _db.CharacterRpProfiles
+            .SingleOrDefaultAsync(p => p.UserUID == uid && p.CharacterName == characterName && p.WorldId == worldId, ct);
+
+        if (profile is null)
+        {
+            profile = new CharacterRpProfileData
+            {
+                UserUID = uid,
+                CharacterName = characterName,
+                WorldId = worldId,
+            };
+            _db.CharacterRpProfiles.Add(profile);
+        }
+
+        profile.RpFirstName = NullIfEmpty(body.RpFirstName);
+        profile.RpLastName = NullIfEmpty(body.RpLastName);
+        profile.RpTitle = NullIfEmpty(body.RpTitle);
+        profile.RpAge = NullIfEmpty(body.RpAge);
+        profile.RpRace = NullIfEmpty(body.RpRace);
+        profile.RpEthnicity = NullIfEmpty(body.RpEthnicity);
+        profile.RpHeight = NullIfEmpty(body.RpHeight);
+        profile.RpBuild = NullIfEmpty(body.RpBuild);
+        profile.RpResidence = NullIfEmpty(body.RpResidence);
+        profile.RpOccupation = NullIfEmpty(body.RpOccupation);
+        profile.RpAffiliation = NullIfEmpty(body.RpAffiliation);
+        profile.RpAlignment = NullIfEmpty(body.RpAlignment);
+        profile.RpAdditionalInfo = NullIfEmpty(body.RpAdditionalInfo);
+        profile.RpCustomFields = NormalizeCustomFields(body.RpCustomFields);
+        profile.RpNameColor = NullIfEmpty(body.RpNameColor);
+        profile.IsRpNSFW = body.IsRpNSFW;
+        profile.RpLevel = body.RpLevel;
+
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
+
+        static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+    }
+    
+
+    public sealed record EnrichedProfileResponse(string? Json, string? Visibility);
+    public sealed record EnrichedProfileRequest(string? Json, string? Visibility);
+
+    private static readonly string[] AllowedVisibilities = ["private", "pairs", "syncshells", "public"];
+
+    [HttpGet("rp-enriched/{uid}/{worldId:int}/{characterName}")]
+    [Authorize(Policy = "ConnectIncoming")]
+    public async Task<IActionResult> GetEnrichedProfile(string uid, uint worldId, string characterName, CancellationToken ct)
+    {
+        var profile = await _db.CharacterRpProfiles
+            .AsNoTracking()
+            .SingleOrDefaultAsync(p => p.UserUID == uid && p.CharacterName == characterName && p.WorldId == worldId, ct);
+        return Ok(new EnrichedProfileResponse(profile?.EnrichedProfileJson, profile?.EnrichedProfileVisibility ?? "private"));
+    }
+
+    [HttpPut("rp-enriched/{uid}/{worldId:int}/{characterName}")]
+    [Authorize(Policy = "ConnectIncoming")]
+    public async Task<IActionResult> PutEnrichedProfile(string uid, uint worldId, string characterName,
+        [FromBody] EnrichedProfileRequest body, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(uid) || string.IsNullOrWhiteSpace(characterName) || worldId == 0)
+            return BadRequest(new { error = "invalid_key" });
+
+        var visibility = body.Visibility ?? "private";
+        if (Array.IndexOf(AllowedVisibilities, visibility) < 0)
+            return BadRequest(new { error = "invalid_visibility" });
+
+        var profile = await _db.CharacterRpProfiles
+            .SingleOrDefaultAsync(p => p.UserUID == uid && p.CharacterName == characterName && p.WorldId == worldId, ct);
+
+        if (profile is null)
+        {
+            profile = new CharacterRpProfileData
+            {
+                UserUID = uid,
+                CharacterName = characterName,
+                WorldId = worldId,
+            };
+            _db.CharacterRpProfiles.Add(profile);
+        }
+
+        profile.EnrichedProfileJson = string.IsNullOrWhiteSpace(body.Json) ? null : body.Json;
+        profile.EnrichedProfileVisibility = visibility;
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    private static string? NormalizeCustomFields(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(raw);
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array) return null;
+            var items = new List<object>();
+            int idx = 0;
+            foreach (var el in doc.RootElement.EnumerateArray())
+            {
+                if (el.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
+                var name = TryStr(el, "Name") ?? TryStr(el, "name") ?? "";
+                var value = TryStr(el, "Value") ?? TryStr(el, "value") ?? "";
+                if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(value)) continue;
+                items.Add(new { Name = name.Trim(), Value = value.Trim(), Order = idx++ });
+            }
+            if (items.Count == 0) return null;
+            return System.Text.Json.JsonSerializer.Serialize(items);
+        }
+        catch { return null; }
+
+        static string? TryStr(System.Text.Json.JsonElement el, string key) =>
+            el.TryGetProperty(key, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String
+                ? v.GetString() : null;
     }
 }

@@ -237,7 +237,9 @@ public class Startup
             o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
             o.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
             o.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
-        }).AddJwtBearer();
+        }).AddJwtBearer()
+        .AddScheme<ConnectIncomingAuthOptions, ConnectIncomingAuthHandler>(
+            ConnectIncomingAuthHandler.SchemeName, _ => { });
 
         services.AddAuthorization(options =>
         {
@@ -262,6 +264,11 @@ public class Startup
                 policy.AddRequirements(new UserRequirement(UserRequirements.Identified | UserRequirements.Moderator | UserRequirements.Administrator));
             });
             options.AddPolicy("Internal", new AuthorizationPolicyBuilder().RequireClaim(MareClaimTypes.Internal, "true").Build());
+            options.AddPolicy("ConnectIncoming", policy =>
+            {
+                policy.AuthenticationSchemes = new[] { ConnectIncomingAuthHandler.SchemeName };
+                policy.RequireClaim(ConnectIncomingAuthHandler.CallerClaim, ConnectIncomingAuthHandler.CallerValue);
+            });
         });
     }
 

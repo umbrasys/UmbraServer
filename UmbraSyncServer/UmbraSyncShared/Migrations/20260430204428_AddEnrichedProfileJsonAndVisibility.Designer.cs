@@ -3,6 +3,7 @@ using System;
 using MareSynchronosShared.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MareSynchronosServer.Migrations
 {
     [DbContext(typeof(MareDbContext))]
-    partial class MareDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260430204428_AddEnrichedProfileJsonAndVisibility")]
+    partial class AddEnrichedProfileJsonAndVisibility
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -382,10 +385,6 @@ namespace MareSynchronosServer.Migrations
                     b.Property<string>("EnrichedProfileJson")
                         .HasColumnType("text")
                         .HasColumnName("enriched_profile_json");
-
-                    b.Property<string>("EnrichedProfileVisibility")
-                        .HasColumnType("text")
-                        .HasColumnName("enriched_profile_visibility");
 
                     b.Property<bool>("IsRpNSFW")
                         .HasColumnType("boolean")

@@ -37,4 +37,6 @@ public class CharacterRpProfileData
     public string? MoodlesData { get; set; }
     public ushort ChatIcon { get; set; }
     public byte RpLevel { get; set; }
+    public string? EnrichedProfileJson { get; set; }
+    public string? EnrichedProfileVisibility { get; set; }
 }

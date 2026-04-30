@@ -25,15 +25,20 @@ public sealed class ConnectClient
         _config.CurrentValue.ConnectBaseUrl is not null &&
         !string.IsNullOrEmpty(_config.CurrentValue.ConnectServiceToken);
 
-    public async Task<GenerateLinkCodeResult> GenerateLinkCodeAsync(string uid, string? alias, CancellationToken ct)
+    public async Task<GenerateLinkCodeResult> GenerateLinkCodeAsync(string uid, string? alias, IReadOnlyList<CharacterInfo>? characters, CancellationToken ct)
     {
         var cfg = _config.CurrentValue;
         if (cfg.ConnectBaseUrl is null || string.IsNullOrEmpty(cfg.ConnectServiceToken))
             throw new InvalidOperationException("Ashfall Connect n'est pas configuré (ConnectBaseUrl/ConnectServiceToken).");
 
+        // Metadata transmise à Connect : pour UmbraSync, on inclut la liste des persos qui partagent la SecretKey utilisée par le user. Connect stocke ça en JSONB sur le LinkedAccount.
+        object? metadata = characters is { Count: > 0 }
+            ? new { characters = characters.Select(c => new { name = c.Name, world = c.World }).ToArray() }
+            : null;
+
         var req = new HttpRequestMessage(HttpMethod.Post, new Uri(cfg.ConnectBaseUrl, "/api/v1/link-codes"))
         {
-            Content = JsonContent.Create(new { identifier = uid, alias }),
+            Content = JsonContent.Create(new { identifier = uid, alias, metadata }),
         };
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", cfg.ConnectServiceToken);
 
@@ -73,9 +78,38 @@ public sealed class ConnectClient
         }
     }
 
+    public async Task<LinkCodeStatus?> GetLinkCodeStatusAsync(string code, CancellationToken ct)
+    {
+        var cfg = _config.CurrentValue;
+        if (cfg.ConnectBaseUrl is null || string.IsNullOrEmpty(cfg.ConnectServiceToken))
+            return null;
+
+        var encoded = Uri.EscapeDataString(code);
+        var req = new HttpRequestMessage(HttpMethod.Get, new Uri(cfg.ConnectBaseUrl, $"/api/v1/link-codes/{encoded}/status"));
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", cfg.ConnectServiceToken);
+
+        try
+        {
+            using var res = await _httpClient.SendAsync(req, ct);
+            if (res.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return new LinkCodeStatus("not_found", null, null, null);
+            if (!res.IsSuccessStatusCode) return null;
+            return await res.Content.ReadFromJsonAsync<LinkCodeStatus>(cancellationToken: ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Échec de l'interrogation de Connect (link-status)");
+            return null;
+        }
+    }
+
     public sealed record GenerateLinkCodeResult(string Code, DateTimeOffset ExpiresAt);
+
+    public sealed record CharacterInfo(string Name, string World);
 
     private sealed record CreateCodeResponse(string Code, DateTimeOffset ExpiresAt);
 
     public sealed record VerificationResult(bool Verified, string? Level, DateTimeOffset? Since);
+
+    public sealed record LinkCodeStatus(string Status, string? LinkedTo, DateTimeOffset? ExpiresAt, DateTimeOffset? ConsumedAt);
 }
