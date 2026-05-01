@@ -77,6 +77,41 @@ public sealed class ConnectClient
             return null;
         }
     }
+    
+    public async Task<bool> PushMetadataAsync(string uid, string? alias, IReadOnlyList<CharacterInfo>? characters, CancellationToken ct)
+    {
+        var cfg = _config.CurrentValue;
+        if (cfg.ConnectBaseUrl is null || string.IsNullOrEmpty(cfg.ConnectServiceToken))
+            return false;
+
+        object? metadata = characters is { Count: > 0 }
+            ? new { characters = characters.Select(c => new { name = c.Name, world = c.World }).ToArray() }
+            : null;
+
+        var req = new HttpRequestMessage(HttpMethod.Post,
+            new Uri(cfg.ConnectBaseUrl, $"/api/v1/links/{ServiceName}/{Uri.EscapeDataString(uid)}/metadata"))
+        {
+            Content = JsonContent.Create(new { alias, metadata }),
+        };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", cfg.ConnectServiceToken);
+
+        try
+        {
+            using var res = await _httpClient.SendAsync(req, ct);
+            if (res.StatusCode == System.Net.HttpStatusCode.NotFound) return false;
+            if (!res.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Connect a refusé le push de metadata (status {Status})", (int)res.StatusCode);
+                return false;
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Échec du push de metadata vers Connect");
+            return false;
+        }
+    }
 
     public async Task<LinkCodeStatus?> GetLinkCodeStatusAsync(string code, CancellationToken ct)
     {

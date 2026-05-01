@@ -58,6 +58,7 @@ public sealed class ConnectController : ControllerBase
 
     public sealed record GenerateLinkCodeRequest(List<CharacterDto>? Characters);
     public sealed record CharacterDto(string Name, string World);
+    public sealed record SyncCharactersRequest(List<CharacterDto>? Characters);
 
     private const int MaxCharacters = 50;
     private const int MaxFieldLength = 64;
@@ -103,6 +104,41 @@ public sealed class ConnectController : ControllerBase
         }
     }
     
+    [HttpPost("sync-characters")]
+    [Authorize(Policy = "Authenticated")]
+    public async Task<IActionResult> SyncCharacters([FromBody] SyncCharactersRequest? body, CancellationToken ct)
+    {
+        if (!_connect.IsConfigured)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = "connect_not_configured" });
+
+        var uid = User.Claims.SingleOrDefault(c => string.Equals(c.Type, MareClaimTypes.Uid, StringComparison.Ordinal))?.Value;
+        if (string.IsNullOrEmpty(uid)) return Unauthorized();
+
+        var alias = User.Claims.SingleOrDefault(c => string.Equals(c.Type, MareClaimTypes.Alias, StringComparison.Ordinal))?.Value;
+
+        // Mêmes garde-fous que GenerateLinkCode : whitelist Name + World, troncature, plafond.
+        var characters = body?.Characters?
+            .Where(c => !string.IsNullOrWhiteSpace(c.Name))
+            .Take(MaxCharacters)
+            .Select(c => new ConnectClient.CharacterInfo(
+                Truncate(c.Name, MaxFieldLength),
+                Truncate(c.World ?? string.Empty, MaxFieldLength)))
+            .ToList();
+
+        static string Truncate(string s, int max) => s.Length <= max ? s : s[..max];
+
+        try
+        {
+            var pushed = await _connect.PushMetadataAsync(uid, alias, characters, ct);
+            return pushed ? Ok(new { synced = true }) : NotFound(new { synced = false });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Échec du push de metadata vers Connect (sync-characters)");
+            return StatusCode(StatusCodes.Status502BadGateway, new { error = "connect_unreachable" });
+        }
+    }
+
     public sealed record RpAvatarDto(string CharacterName, uint WorldId, string? AvatarBase64);
 
     [HttpGet("rp-avatars/{uid}")]
@@ -181,28 +217,36 @@ public sealed class ConnectController : ControllerBase
             _db.CharacterRpProfiles.Add(profile);
         }
 
-        profile.RpFirstName = NullIfEmpty(body.RpFirstName);
-        profile.RpLastName = NullIfEmpty(body.RpLastName);
-        profile.RpTitle = NullIfEmpty(body.RpTitle);
-        profile.RpAge = NullIfEmpty(body.RpAge);
-        profile.RpRace = NullIfEmpty(body.RpRace);
-        profile.RpEthnicity = NullIfEmpty(body.RpEthnicity);
-        profile.RpHeight = NullIfEmpty(body.RpHeight);
-        profile.RpBuild = NullIfEmpty(body.RpBuild);
-        profile.RpResidence = NullIfEmpty(body.RpResidence);
-        profile.RpOccupation = NullIfEmpty(body.RpOccupation);
-        profile.RpAffiliation = NullIfEmpty(body.RpAffiliation);
-        profile.RpAlignment = NullIfEmpty(body.RpAlignment);
-        profile.RpAdditionalInfo = NullIfEmpty(body.RpAdditionalInfo);
+        // Bornes serveur — Connect a déjà ses propres limites côté UI mais on les répète ici
+        // pour ne pas faire confiance au client. Doublé par rapport aux UI maxlength pour la
+        // marge (UI=240 → DB=480 etc.) au cas où on rallonge un jour les champs côté UI.
+        profile.RpFirstName = TrimOrNull(body.RpFirstName, 480);
+        profile.RpLastName = TrimOrNull(body.RpLastName, 480);
+        profile.RpTitle = TrimOrNull(body.RpTitle, 480);
+        profile.RpAge = TrimOrNull(body.RpAge, 480);
+        profile.RpRace = TrimOrNull(body.RpRace, 480);
+        profile.RpEthnicity = TrimOrNull(body.RpEthnicity, 480);
+        profile.RpHeight = TrimOrNull(body.RpHeight, 480);
+        profile.RpBuild = TrimOrNull(body.RpBuild, 480);
+        profile.RpResidence = TrimOrNull(body.RpResidence, 480);
+        profile.RpOccupation = TrimOrNull(body.RpOccupation, 480);
+        profile.RpAffiliation = TrimOrNull(body.RpAffiliation, 480);
+        profile.RpAlignment = TrimOrNull(body.RpAlignment, 480);
+        profile.RpAdditionalInfo = TrimOrNull(body.RpAdditionalInfo, 2000);
         profile.RpCustomFields = NormalizeCustomFields(body.RpCustomFields);
-        profile.RpNameColor = NullIfEmpty(body.RpNameColor);
+        profile.RpNameColor = TrimOrNull(body.RpNameColor, 32);
         profile.IsRpNSFW = body.IsRpNSFW;
         profile.RpLevel = body.RpLevel;
 
         await _db.SaveChangesAsync(ct);
         return NoContent();
 
-        static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+        static string? TrimOrNull(string? s, int max)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            var t = s.Trim();
+            return t.Length <= max ? t : t[..max];
+        }
     }
     
 
