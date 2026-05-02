@@ -165,20 +165,11 @@ public partial class MareHub : Hub<IMareHub>, IMareHub
             await SafeLifecycleStep("SendOnlineToAllPairedUsers", async () => { _ = await SendOnlineToAllPairedUsers().ConfigureAwait(false); }).ConfigureAwait(false);
         }
 
-        int notifiedOnlinePairs = 0;
-        await SafeLifecycleStep("NotifyCallerOfOnlinePairs", async () =>
-        {
-            var allPairedUsers = await GetAllPairedUnpausedUsers().ConfigureAwait(false);
-            var onlinePairs = await GetOnlineUsers(allPairedUsers).ConfigureAwait(false);
-            foreach (var kvp in onlinePairs)
-            {
-                await Clients.Caller
-                    .Client_UserSendOnline(new(new(kvp.Key), kvp.Value))
-                    .ConfigureAwait(false);
-                notifiedOnlinePairs++;
-            }
-        }).ConfigureAwait(false);
-        _logger.LogCallInfo(MareHubLogger.Args("NotifyCallerOfOnlinePairs", "count", notifiedOnlinePairs));
+        // Note: pas de push Client_UserSendOnline ici. Le client appelle UserGetOnlinePairs
+        // immédiatement après OnConnectedAsync et peuple ses paires via MarkPairOnline(sendNotif:false).
+        // L'ancienne boucle séquentielle (1 RPC par paire) bloquait OnConnectedAsync ~35ms × N paires,
+        // ce qui dépassait les ~5s pour les users à >140 paires (ex. 175 paires = 6s) et causait
+        // des déconnexions WS systématiques.
 
         _logger.LogCallInfo(MareHubLogger.Args("Connect setup complete", Context.ConnectionId, isFirstConnection ? "first" : "additional"));
 
