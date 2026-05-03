@@ -383,6 +383,7 @@ public class Startup
                 options.ApplicationMaxBufferSize = 104857600;
                 options.TransportMaxBufferSize = 104857600;
                 options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling;
+                options.LongPolling.PollTimeout = TimeSpan.FromSeconds(10);
             });
 
             endpoints.MapHealthChecks("/health").AllowAnonymous();
