@@ -61,6 +61,9 @@ public class MareDbContext : DbContext
     public DbSet<HousingShare> HousingShares { get; set; }
     public DbSet<HousingShareAllowedUser> HousingShareAllowedUsers { get; set; }
     public DbSet<HousingShareAllowedGroup> HousingShareAllowedGroups { get; set; }
+    public DbSet<HousingScenario> HousingScenarios { get; set; }
+    public DbSet<HousingScenarioAllowedUser> HousingScenarioAllowedUsers { get; set; }
+    public DbSet<HousingScenarioAllowedGroup> HousingScenarioAllowedGroups { get; set; }
     public DbSet<Establishment> Establishments { get; set; }
     public DbSet<EstablishmentEvent> EstablishmentEvents { get; set; }
     public DbSet<WildRpAnnouncement> WildRpAnnouncements { get; set; }
@@ -77,6 +80,7 @@ public class MareDbContext : DbContext
         ConfigureMcdfShareEntities(mb);
         ConfigureSlotEntities(mb);
         ConfigureHousingShareEntities(mb);
+        ConfigureHousingScenarioEntities(mb);
         ConfigureEstablishmentEntities(mb);
         ConfigureWildRpEntities(mb);
         ConfigurePermissionEntities(mb);
@@ -271,6 +275,38 @@ public class MareDbContext : DbContext
         mb.Entity<HousingShareAllowedGroup>().ToTable("housing_share_allowed_groups");
         mb.Entity<HousingShareAllowedGroup>().HasKey(g => new { g.ShareId, g.AllowedGroupGid });
         mb.Entity<HousingShareAllowedGroup>().HasIndex(g => g.AllowedGroupGid);
+    }
+
+    private static void ConfigureHousingScenarioEntities(ModelBuilder mb)
+    {
+        mb.Entity<HousingScenario>().ToTable("housing_scenarios");
+        mb.Entity<HousingScenario>().HasIndex(s => s.OwnerUID);
+        mb.Entity<HousingScenario>().HasIndex(s => new { s.ServerId, s.TerritoryId, s.DivisionId, s.WardId, s.HouseId });
+        mb.Entity<HousingScenario>().HasOne(s => s.Owner).WithMany().HasForeignKey(s => s.OwnerUID).OnDelete(DeleteBehavior.Cascade);
+        mb.Entity<HousingScenario>().Property(s => s.Description).HasColumnType("text");
+        mb.Entity<HousingScenario>().Property(s => s.ServerId).HasColumnType("bigint");
+        mb.Entity<HousingScenario>().Property(s => s.MapId).HasColumnType("bigint");
+        mb.Entity<HousingScenario>().Property(s => s.TerritoryId).HasColumnType("bigint");
+        mb.Entity<HousingScenario>().Property(s => s.DivisionId).HasColumnType("bigint");
+        mb.Entity<HousingScenario>().Property(s => s.WardId).HasColumnType("bigint");
+        mb.Entity<HousingScenario>().Property(s => s.HouseId).HasColumnType("bigint");
+        mb.Entity<HousingScenario>().Property(s => s.RoomId).HasColumnType("bigint");
+        mb.Entity<HousingScenario>().Property(s => s.CipherData).HasColumnType("bytea");
+        mb.Entity<HousingScenario>().Property(s => s.Nonce).HasColumnType("bytea");
+        mb.Entity<HousingScenario>().Property(s => s.Salt).HasColumnType("bytea");
+        mb.Entity<HousingScenario>().Property(s => s.Tag).HasColumnType("bytea");
+        mb.Entity<HousingScenario>().Property(s => s.CreatedUtc).HasColumnType("timestamp with time zone");
+        mb.Entity<HousingScenario>().Property(s => s.UpdatedUtc).HasColumnType("timestamp with time zone");
+        mb.Entity<HousingScenario>().HasMany(s => s.AllowedIndividuals).WithOne(a => a.Share).HasForeignKey(a => a.ShareId).OnDelete(DeleteBehavior.Cascade);
+        mb.Entity<HousingScenario>().HasMany(s => s.AllowedSyncshells).WithOne(a => a.Share).HasForeignKey(a => a.ShareId).OnDelete(DeleteBehavior.Cascade);
+
+        mb.Entity<HousingScenarioAllowedUser>().ToTable("housing_scenario_allowed_users");
+        mb.Entity<HousingScenarioAllowedUser>().HasKey(u => new { u.ShareId, u.AllowedIndividualUid });
+        mb.Entity<HousingScenarioAllowedUser>().HasIndex(u => u.AllowedIndividualUid);
+
+        mb.Entity<HousingScenarioAllowedGroup>().ToTable("housing_scenario_allowed_groups");
+        mb.Entity<HousingScenarioAllowedGroup>().HasKey(g => new { g.ShareId, g.AllowedGroupGid });
+        mb.Entity<HousingScenarioAllowedGroup>().HasIndex(g => g.AllowedGroupGid);
     }
 
     private static void ConfigureEstablishmentEntities(ModelBuilder mb)
